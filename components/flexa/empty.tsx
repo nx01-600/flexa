@@ -1,15 +1,20 @@
-import { Hourglass } from "lucide-react";
-import { Card } from "@/components/flexa/ui";
+import { Hourglass, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { Blob } from "@/components/flexa/shapes";
+import { Card, IconBox } from "@/components/flexa/ui";
 
 // For sections whose content Flexa has not defined yet (see proyecto/flexa.md).
-export function Pending({ title, text }: { title: string; text: string }) {
+export function Pending({ title, text, icon: Icon = Hourglass, action }: { title: string; text: string; icon?: LucideIcon; action?: ReactNode }) {
   return (
-    <Card className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-      <span className="grid size-14 place-items-center rounded-full bg-green-100 text-green-700">
-        <Hourglass className="size-6" />
-      </span>
-      <h2 className="text-lg font-bold text-ink">{title}</h2>
-      <p className="max-w-md text-sm text-ink-2">{text}</p>
+    <Card tone="soft" className="relative isolate flex flex-col items-center gap-3 overflow-hidden px-6 py-16 text-center">
+      <Blob shape={0} className="-top-16 -right-16 -z-10 size-[220px] opacity-80" />
+      <Blob shape={2} className="-bottom-20 -left-16 -z-10 size-[200px] opacity-70" />
+      <IconBox size="lg" halo>
+        <Icon />
+      </IconBox>
+      <h2 className="mt-2 text-h2 text-ink">{title}</h2>
+      <p className="max-w-md text-[15px] font-medium text-ink-2">{text}</p>
+      {action && <div className="mt-3">{action}</div>}
     </Card>
   );
 }
