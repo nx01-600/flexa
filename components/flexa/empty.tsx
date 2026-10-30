@@ -1,10 +1,10 @@
-import { Hourglass, type LucideIcon } from "lucide-react";
+import { Hourglass, type IconType } from "@/components/flexa/icons";
 import type { ReactNode } from "react";
 import { Blob } from "@/components/flexa/shapes";
 import { Card, IconBox } from "@/components/flexa/ui";
 
 // For sections whose content Flexa has not defined yet (see proyecto/flexa.md).
-export function Pending({ title, text, icon: Icon = Hourglass, action }: { title: string; text: string; icon?: LucideIcon; action?: ReactNode }) {
+export function Pending({ title, text, icon: Icon = Hourglass, action }: { title: string; text: string; icon?: IconType; action?: ReactNode }) {
   return (
     <Card tone="soft" className="relative isolate flex flex-col items-center gap-3 overflow-hidden px-6 py-16 text-center">
       <Blob shape={0} className="-top-16 -right-16 -z-10 size-[220px] opacity-80" />

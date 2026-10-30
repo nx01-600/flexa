@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarDays, Lock, MapPin, Percent, Plus, Repeat } from "lucide-react";
+import { Building2, CalendarDays, Lock, MapPin, Percent, Plus, Repeat } from "@/components/flexa/icons";
 import { useState } from "react";
 import { PageHeader } from "@/components/flexa/company-shell";
 import { Avatar, CardHead, Kebab, Toggle } from "@/components/flexa/empresas-ui";

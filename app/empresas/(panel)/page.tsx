@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUp, Banknote, CalendarClock, ChevronRight, FileSpreadsheet, FileText, HandCoins, Scale, Smartphone, TriangleAlert, Users } from "lucide-react";
+import { ArrowUp, Banknote, CalendarClock, ChevronRight, FileSpreadsheet, FileText, HandCoins, Scale, Smartphone, TriangleAlert, Users } from "@/components/flexa/icons";
 import { Bars } from "@/components/flexa/charts";
 import { PageHeader } from "@/components/flexa/company-shell";
 import { Avatar, CardHead, Kpi, MoreLink } from "@/components/flexa/empresas-ui";

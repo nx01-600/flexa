@@ -1,7 +1,7 @@
 "use client";
 
 import { useReducedMotion } from "motion/react";
-import { BadgeCheck, Banknote, Clock, HandCoins, Info } from "lucide-react";
+import { BadgeCheck, Banknote, Clock, HandCoins, Info } from "@/components/flexa/icons";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { short } from "@/components/flexa/charts";
 import { CardHead, Kebab, Kpi } from "@/components/flexa/empresas-ui";

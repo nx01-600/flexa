@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ArrowUpRight, Receipt } from "lucide-react";
+import { ArrowUpRight, Receipt } from "@/components/flexa/icons";
 import { useState } from "react";
 import { TopBar } from "@/components/flexa/app-shell";
 import { MovementRow } from "@/components/flexa/movement-row";

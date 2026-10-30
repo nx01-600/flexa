@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUp, CalendarDays, ChevronRight, MapPin, ShieldCheck, TrendingUp, Trophy } from "lucide-react";
+import { ArrowUp, CalendarDays, ChevronRight, MapPin, ShieldCheck, TrendingUp, Trophy } from "@/components/flexa/icons";
 import { useState } from "react";
 import { Bars, Donut, donutColors, TrendArea } from "@/components/flexa/charts";
 import { PageHeader } from "@/components/flexa/company-shell";

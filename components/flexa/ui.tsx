@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import { IconWeight, type IconType } from "@/components/flexa/icons";
 import { cn } from "@/lib/utils";
 
 const buttonBase =
@@ -83,7 +83,7 @@ export const inputClass =
   "h-13 w-full rounded-md border-[1.5px] border-input bg-surface px-4 text-base font-medium text-ink shadow-xs placeholder:font-medium placeholder:text-ink-3 transition-[border-color,box-shadow] duration-150 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-200/70 aria-invalid:border-danger";
 
 // Text input. `icon` adds a leading glyph, `end` a trailing slot (eye toggle, unit).
-export function Input({ className, icon: Icon, end, ...props }: ComponentProps<"input"> & { icon?: LucideIcon; end?: ReactNode }) {
+export function Input({ className, icon: Icon, end, ...props }: ComponentProps<"input"> & { icon?: IconType; end?: ReactNode }) {
   if (!Icon && !end) return <input className={cn(inputClass, className)} {...props} />;
   return (
     <div className="relative">
@@ -121,7 +121,7 @@ const iconSizes = {
   sm: "size-9 [&_svg]:size-[18px]", // 36px, list rows
   md: "size-11 [&_svg]:size-[22px]", // 44px, default
   lg: "size-14 [&_svg]:size-[26px]", // 56px, headers and tiles
-  xl: "size-[72px] [&_svg]:size-9 [&_svg]:stroke-[2.75]", // 72px, success / hero
+  xl: "size-[72px] [&_svg]:size-9", // 72px, success / hero
 };
 
 export type IconTone = keyof typeof iconTones;
@@ -142,7 +142,7 @@ export function IconBox({
 }) {
   return (
     <span className={cn("grid shrink-0 place-items-center rounded-full", iconSizes[size], iconTones[tone], halo && "ring-8 ring-mint-1", className)}>
-      {children}
+      <IconWeight weight="fill">{children}</IconWeight>
     </span>
   );
 }
@@ -166,7 +166,7 @@ export function StatTile({
   row,
   className,
 }: {
-  icon: LucideIcon;
+  icon: IconType;
   label: string;
   value: ReactNode;
   hint?: ReactNode;

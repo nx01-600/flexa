@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar } from "lucide-react";
+import { Calendar } from "@/components/flexa/icons";
 import { useState } from "react";
 import { Choice } from "@/components/flexa/choice";
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, IdCard, LockKeyhole, UserRound } from "lucide-react";
+import { Eye, EyeOff, IdCard, LockKeyhole, UserRound } from "@/components/flexa/icons";
 import { useState } from "react";
 import { Button, Field, Input } from "@/components/flexa/ui";
 

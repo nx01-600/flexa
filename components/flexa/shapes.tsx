@@ -9,9 +9,9 @@ const paths = [
 ];
 
 const tones = {
-  green: ["#d3e9ce", "#e9f4e6"],
-  deep: ["#c2e0bc", "#dcefd8"],
-  pink: ["#f8c9c4", "#fde8e6"],
+  green: ["#ddf2d7", "#f1faee"],
+  deep: ["#cdeec5", "#e8f7e4"],
+  pink: ["#fad3cf", "#fdeeec"],
 };
 
 type Tone = keyof typeof tones;
@@ -21,7 +21,7 @@ export function Blob({ shape = 0, tone = "green", className }: { shape?: 0 | 1 |
   const id = `flexa-blob-${tone}`;
   const [from, to] = tones[tone];
   return (
-    <svg viewBox="0 0 200 200" preserveAspectRatio="none" aria-hidden className={cn("pointer-events-none absolute blur-[2px]", className)}>
+    <svg viewBox="0 0 200 200" preserveAspectRatio="none" aria-hidden className={cn("pointer-events-none absolute blur-[3px]", className)}>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor={from} />

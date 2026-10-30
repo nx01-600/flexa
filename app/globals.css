@@ -11,9 +11,9 @@
 
 @theme {
   /* brand greens, light to dark */
-  --color-green-50: #f3f8f1;
-  --color-green-100: #e6f2e3;
-  --color-green-200: #cbe6c8;
+  --color-green-50: #f2f9f0;
+  --color-green-100: #e3f4df;
+  --color-green-200: #c6eac0;
   --color-green-300: #a8d6a6;
   --color-green-400: #7cc383;
   --color-green-500: #4fa95c;
@@ -23,11 +23,11 @@
   --color-green-900: #143d22;
 
   /* soft mints used by cards, washes and blobs */
-  --color-mint-1: #f1f8ee;
-  --color-mint-2: #eaf5e6;
-  --color-mint-3: #d6ecd1;
+  --color-mint-1: #f3faf1;
+  --color-mint-2: #e9f7e5;
+  --color-mint-3: #d4efcd;
 
-  --color-page: #fafcf9;
+  --color-page: #fbfdfb;
   --color-ink: #1b2420;
   --color-ink-2: #4f5b55;
   --color-ink-3: #6b766f;
@@ -90,13 +90,19 @@
 
 /* Gradient fills. Each is a background-image, so it composes with bg-color. */
 @utility bg-card-soft {
-  background-image: linear-gradient(160deg, #ffffff 0%, #f1f8ee 100%);
+  background-image: linear-gradient(160deg, #ffffff 0%, #f4faf2 100%);
 }
 @utility bg-card-mint {
-  background-image: linear-gradient(135deg, #eaf5e6 0%, #d6ecd1 100%);
+  background-image: linear-gradient(135deg, #eef9eb 0%, #dcf2d6 100%);
 }
 @utility bg-card-login {
-  background-image: linear-gradient(170deg, #e2f0de 0%, #f1f8ef 55%, #fafcf9 100%);
+  background-image: linear-gradient(170deg, #ecf8e8 0%, #f6fbf4 55%, #ffffff 100%);
+}
+@utility bg-card-hero {
+  background-image:
+    radial-gradient(90% 120% at 100% 0%, rgb(124 195 131 / 0.45), transparent 60%),
+    radial-gradient(70% 90% at 0% 100%, rgb(10 40 20 / 0.35), transparent 70%),
+    linear-gradient(135deg, #2f8a47 0%, #1f6a36 55%, #17532a 100%);
 }
 @utility bg-tile-primary {
   background-image:
@@ -110,7 +116,7 @@
   background-image: linear-gradient(180deg, #d94a4a 0%, #c03838 100%);
 }
 @utility bg-tint-green {
-  background-image: linear-gradient(135deg, #eef7ec 0%, #ffffff 100%);
+  background-image: linear-gradient(135deg, #f0f9ed 0%, #ffffff 100%);
 }
 @utility bg-tint-teal {
   background-image: linear-gradient(135deg, #e9f4f3 0%, #ffffff 100%);
@@ -122,10 +128,10 @@
   background-image: linear-gradient(135deg, #fdeeec 0%, #ffffff 100%);
 }
 @utility bg-wash {
-  background-image: radial-gradient(120% 70% at 50% 0%, #e6f2e3 0%, rgb(250 252 249 / 0) 70%);
+  background-image: radial-gradient(120% 70% at 50% 0%, #ebf7e7 0%, rgb(251 253 251 / 0) 70%);
 }
 @utility bg-warning-screen {
-  background-image: linear-gradient(180deg, #fde8e6 0%, #fbd9d6 45%, #fff5f4 100%);
+  background-image: linear-gradient(180deg, #fdeceb 0%, #fce1de 45%, #fff8f7 100%);
 }
 
 @theme inline {

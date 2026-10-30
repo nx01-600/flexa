@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeftRight, ChartColumn, ChevronLeft, CircleHelp, House, LogOut, Menu, UserRound, X } from "lucide-react";
+import { ArrowLeftRight, ChartColumn, ChevronLeft, CircleHelp, House, LogOut, Menu, UserRound, X } from "@/components/flexa/icons";
 import { useState, type ReactNode } from "react";
 import { Logo } from "@/components/flexa/logo";
 import { IconBox } from "@/components/flexa/ui";

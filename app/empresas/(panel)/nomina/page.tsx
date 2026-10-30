@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Check, ChevronRight, CloudUpload, Download, FileSpreadsheet, Lock, Percent, Repeat, UserCheck, Wallet, X } from "lucide-react";
+import { CalendarDays, Check, ChevronRight, CloudUpload, Download, FileSpreadsheet, Lock, Percent, Repeat, UserCheck, Wallet, X } from "@/components/flexa/icons";
 import { useRef, useState } from "react";
 import { PageHeader } from "@/components/flexa/company-shell";
 import { Avatar, CardHead, CheckDot, Kebab, Kpi } from "@/components/flexa/empresas-ui";

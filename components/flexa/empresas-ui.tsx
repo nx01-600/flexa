@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, ChevronRight, EllipsisVertical, type LucideIcon } from "lucide-react";
+import { Check, ChevronRight, EllipsisVertical, type IconType } from "@/components/flexa/icons";
 import type { ReactNode } from "react";
 import { Blob } from "@/components/flexa/shapes";
 import { Card, IconBox } from "@/components/flexa/ui";
@@ -11,7 +11,7 @@ type Tone = "green" | "teal" | "amber" | "red";
 
 // KPI tile: tinted gradient, icon circle top-left, optional trend chip, heavy number.
 // Stacked so long money values ($48.200.000) never clip in a 4-column row.
-export function Kpi({ icon: Icon, value, label, tone = "green", trend, className }: { icon: LucideIcon; value: ReactNode; label: string; tone?: Tone; trend?: ReactNode; className?: string }) {
+export function Kpi({ icon: Icon, value, label, tone = "green", trend, className }: { icon: IconType; value: ReactNode; label: string; tone?: Tone; trend?: ReactNode; className?: string }) {
   return (
     <Card tone={tone} className={cn("relative isolate flex flex-col gap-4 overflow-hidden p-5", className)}>
       <Blob shape={1} tone={tone === "red" ? "pink" : "green"} className="-top-12 -right-12 -z-10 size-32 opacity-45" />

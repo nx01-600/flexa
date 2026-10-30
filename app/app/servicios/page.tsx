@@ -1,4 +1,4 @@
-import { Bus, Droplets, Flame, Smartphone, Sparkles, Wifi, Zap } from "lucide-react";
+import { Bus, Droplets, Flame, Smartphone, Sparkles, Wifi, Zap } from "@/components/flexa/icons";
 import { TopBar } from "@/components/flexa/app-shell";
 import { Backdrop, Blob } from "@/components/flexa/shapes";
 import { Badge, Card, IconBox } from "@/components/flexa/ui";

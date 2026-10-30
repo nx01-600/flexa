@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CircleHelp } from "lucide-react";
+import { CircleHelp } from "@/components/flexa/icons";
 import { Logo } from "@/components/flexa/logo";
 import { LoginForm } from "@/components/flexa/login-form";
 import { Backdrop } from "@/components/flexa/shapes";

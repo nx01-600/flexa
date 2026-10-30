@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CircleHelp, MessageCircle, Phone, Plus, Search } from "lucide-react";
+import { CircleHelp, MessageCircle, Phone, Plus, Search } from "@/components/flexa/icons";
 import { useState } from "react";
 import { TopBar } from "@/components/flexa/app-shell";
 import { Backdrop, Blob } from "@/components/flexa/shapes";

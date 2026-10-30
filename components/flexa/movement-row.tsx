@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, ChevronRight, Smartphone, Wifi, Zap } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Smartphone, Wifi, Zap } from "@/components/flexa/icons";
 import { IconBox } from "@/components/flexa/ui";
 import { money, type Movement } from "@/lib/mock";
 import { cn } from "@/lib/utils";

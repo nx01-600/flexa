@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Building2, Lightbulb, Wallet } from "lucide-react";
+import { Building2, Lightbulb, Wallet } from "@/components/flexa/icons";
 import { useEffect, useRef, useState } from "react";
 import { TopBar } from "@/components/flexa/app-shell";
 import { Choice } from "@/components/flexa/choice";

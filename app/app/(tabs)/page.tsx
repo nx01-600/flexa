@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, ChevronRight, LayoutGrid, Lightbulb, UserRound } from "lucide-react";
+import { ArrowUpRight, ChevronRight, LayoutGrid, Lightbulb, UserRound } from "@/components/flexa/icons";
 import { MenuButton } from "@/components/flexa/app-shell";
 import { Logo } from "@/components/flexa/logo";
 import { MovementRow } from "@/components/flexa/movement-row";
@@ -19,7 +19,7 @@ export default function WorkerHome() {
         <Link
           href="/app/perfil"
           aria-label="Mi perfil"
-          className="grid size-10 place-items-center rounded-full bg-mint-3 text-green-700 shadow-sm ring-4 ring-white/80 transition-transform active:scale-95"
+          className="grid size-10 place-items-center rounded-full bg-green-100 text-green-700 shadow-sm ring-4 ring-white/80 transition-transform active:scale-95"
         >
           <UserRound className="size-5 stroke-[2.5]" />
         </Link>
@@ -31,16 +31,16 @@ export default function WorkerHome() {
       </section>
 
       <Card aria-label="Saldo" className="overflow-hidden">
-        <div className="flex flex-col gap-4 bg-card-mint px-5 pt-5 pb-5">
+        <div className="flex flex-col gap-4 bg-card-hero px-5 pt-5 pb-5 text-white">
           <div className="flex flex-col gap-1">
-            <span className="text-sm font-semibold text-green-900">Total devengado</span>
-            <span className="text-display text-ink tabular-nums">{money(worker.earned)}</span>
+            <span className="text-sm font-semibold text-white/80">Total devengado</span>
+            <span className="text-display text-white tabular-nums">{money(worker.earned)}</span>
           </div>
           <div className="flex flex-col gap-2">
-            <div className="h-2 overflow-hidden rounded-full bg-white/70" role="img" aria-label={`Has retirado el ${withdrawnPct}% de lo devengado`}>
-              <span className="block h-full rounded-full bg-linear-to-r from-green-500 to-green-600" style={{ width: `${withdrawnPct}%` }} />
+            <div className="h-2 overflow-hidden rounded-full bg-white/20" role="img" aria-label={`Has retirado el ${withdrawnPct}% de lo devengado`}>
+              <span className="block h-full rounded-full bg-linear-to-r from-[#c8f0c0] to-white" style={{ width: `${withdrawnPct}%` }} />
             </div>
-            <span className="text-[13px] font-semibold text-green-900">
+            <span className="text-[13px] font-semibold text-white/85">
               Retirado {money(worker.withdrawn)} · {withdrawnPct}%
             </span>
           </div>

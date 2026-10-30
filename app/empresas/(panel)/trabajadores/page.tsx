@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Download, MapPin, Search, TriangleAlert, UserCheck, UserX, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, MapPin, Search, TriangleAlert, UserCheck, UserX, Users } from "@/components/flexa/icons";
 import { useState } from "react";
 import { Choice } from "@/components/flexa/choice";
 import { PageHeader } from "@/components/flexa/company-shell";

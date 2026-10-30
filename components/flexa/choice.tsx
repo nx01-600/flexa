@@ -1,7 +1,7 @@
 "use client";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { LucideIcon } from "lucide-react";
+import type { IconType } from "@/components/flexa/icons";
 import { cn } from "@/lib/utils";
 
 // Brand-styled wrapper over the shadcn Select. Options are plain labels.
@@ -19,7 +19,7 @@ export function Choice({
   value: string | null;
   onChange: (v: string) => void;
   placeholder?: string;
-  icon?: LucideIcon; // leading glyph, e.g. Calendar on period pickers
+  icon?: IconType; // leading glyph, e.g. Calendar on period pickers
   className?: string;
 }) {
   return (

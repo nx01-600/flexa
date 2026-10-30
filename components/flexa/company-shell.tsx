@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChartColumn, CircleHelp, FileSpreadsheet, House, Scale, Settings, UserRound, Users } from "lucide-react";
+import { Bell, ChartColumn, CircleHelp, FileSpreadsheet, House, Scale, Settings, UserRound, Users } from "@/components/flexa/icons";
 import type { ReactNode } from "react";
 import { LogoEmpresas } from "@/components/flexa/logo";
 import { Backdrop, Blob } from "@/components/flexa/shapes";

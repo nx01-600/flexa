@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, CircleDollarSign, CircleMinus, HeartPulse, PiggyBank, Repeat, TriangleAlert } from "lucide-react";
+import { CalendarDays, CircleDollarSign, CircleMinus, HeartPulse, PiggyBank, Repeat, TriangleAlert } from "@/components/flexa/icons";
 import { useState } from "react";
 import { TopBar } from "@/components/flexa/app-shell";
 import { Bars, Donut } from "@/components/flexa/charts";

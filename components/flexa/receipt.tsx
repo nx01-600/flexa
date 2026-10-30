@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { Check, House, Share2 } from "lucide-react";
+import { Check, House, Share2 } from "@/components/flexa/icons";
 import { useState } from "react";
 import { TopBar } from "@/components/flexa/app-shell";
 import { Backdrop } from "@/components/flexa/shapes";

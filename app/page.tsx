@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, Smartphone } from "lucide-react";
+import { ArrowRight, Building2, Smartphone } from "@/components/flexa/icons";
 import { Logo } from "@/components/flexa/logo";
 import { Backdrop } from "@/components/flexa/shapes";
 import { IconBox } from "@/components/flexa/ui";

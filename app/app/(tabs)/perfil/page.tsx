@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Building2, ChevronRight, CircleHelp, KeyRound, LogOut, UserRound } from "lucide-react";
+import { Bell, Building2, ChevronRight, CircleHelp, KeyRound, LogOut, UserRound } from "@/components/flexa/icons";
 import { useState } from "react";
 import { TopBar } from "@/components/flexa/app-shell";
 import { Backdrop } from "@/components/flexa/shapes";
