@@ -3,7 +3,7 @@
 // Sample portrait in public/avatars: "María López" -> "/avatars/maria-lopez.jpg".
 // Photos from randomuser.me, free to use for prototypes.
 export const photo = (name: string) =>
-  `/avatars/${name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, "-")}.jpg`;
+  `/avatars/${name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, "-")}.jpg`;
 
 export const money = (n: number) => "$" + Math.round(n).toLocaleString("es-CO");
 
