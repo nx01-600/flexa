@@ -1,12 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChartColumn, CircleHelp, FileSpreadsheet, House, Scale, Settings, UserRound, Users } from "@/components/flexa/icons";
+import { Bell, ChartColumn, CircleHelp, FileSpreadsheet, House, Scale, Settings, Users } from "@/components/flexa/icons";
 import type { ReactNode } from "react";
 import { LogoEmpresas } from "@/components/flexa/logo";
 import { Backdrop, Blob } from "@/components/flexa/shapes";
-import { company } from "@/lib/mock";
+import { company, photo, team } from "@/lib/mock";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -70,9 +71,7 @@ export function CompanyShell({ children }: { children: ReactNode }) {
               <span className="text-sm font-bold text-ink">{company.name}</span>
               <span className="text-xs font-semibold text-ink-3">Administrador</span>
             </span>
-            <span className="grid size-10 place-items-center rounded-full bg-btn-primary text-white shadow-btn [&_svg]:size-5 [&_svg]:stroke-[2.5]">
-              <UserRound />
-            </span>
+            <Image src={photo(team[0].name)} alt="" width={80} height={80} className="size-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
           </Link>
         </div>
       </header>

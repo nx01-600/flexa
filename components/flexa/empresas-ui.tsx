@@ -1,8 +1,10 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Check, ChevronRight, EllipsisVertical, type IconType } from "@/components/flexa/icons";
 import type { ReactNode } from "react";
 import { Blob } from "@/components/flexa/shapes";
 import { Card, IconBox } from "@/components/flexa/ui";
+import { photo } from "@/lib/mock";
 import { cn } from "@/lib/utils";
 
 // Desktop-only building blocks for Flexa Empresas.
@@ -52,13 +54,10 @@ export function MoreLink({ href, children = "Ver más" }: { href: string; childr
   );
 }
 
-const avatarTints = ["bg-green-100 text-green-800", "bg-teal-soft text-teal", "bg-warning-soft text-warning", "bg-[#e6eefa] text-[#2f4f86]", "bg-danger-soft text-danger"];
 
 // Initials circle with a tint picked from the name, stable across renders.
 export function Avatar({ name, className }: { name: string; className?: string }) {
-  const initials = name.split(" ").map((p) => p[0]).slice(0, 2).join("");
-  const tint = avatarTints[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % avatarTints.length];
-  return <span className={cn("grid size-9 shrink-0 place-items-center rounded-full text-xs font-extrabold", tint, className)}>{initials}</span>;
+  return <Image src={photo(name)} alt="" width={80} height={80} className={cn("size-9 shrink-0 rounded-full object-cover ring-2 ring-white shadow-xs", className)} />;
 }
 
 export function Kebab({ label }: { label: string }) {

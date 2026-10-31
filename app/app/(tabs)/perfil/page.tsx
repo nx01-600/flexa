@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Bell, Building2, ChevronRight, CircleHelp, KeyRound, LogOut, UserRound } from "@/components/flexa/icons";
 import { useState } from "react";
@@ -7,7 +8,7 @@ import { TopBar } from "@/components/flexa/app-shell";
 import { Backdrop } from "@/components/flexa/shapes";
 import { Badge, Card, IconBox } from "@/components/flexa/ui";
 import { Switch } from "@/components/ui/switch";
-import { worker } from "@/lib/mock";
+import { photo, worker } from "@/lib/mock";
 import { cn } from "@/lib/utils";
 
 const rows = [
@@ -29,9 +30,7 @@ export default function Profile() {
       <TopBar title="Mi perfil" />
       <main className="flex flex-col gap-6 px-5 pt-3">
         <section className="flex flex-col items-center gap-4 text-center">
-          <span className="grid size-[88px] place-items-center rounded-full bg-linear-to-br from-mint-2 to-mint-3 text-green-600 shadow-card ring-[6px] ring-white">
-            <UserRound className="size-11" />
-          </span>
+          <Image src={photo(worker.name)} alt={worker.name} width={128} height={128} priority className="size-[96px] rounded-full object-cover shadow-card ring-[5px] ring-white" />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-h2 text-ink">{worker.name}</h2>
             <span className="text-sm font-semibold text-ink-2 tabular-nums">{worker.doc}</span>

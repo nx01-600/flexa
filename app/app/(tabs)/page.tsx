@@ -1,11 +1,12 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, ChevronRight, LayoutGrid, Lightbulb, UserRound } from "@/components/flexa/icons";
+import { ArrowUpRight, ChevronRight, LayoutGrid, Lightbulb } from "@/components/flexa/icons";
 import { MenuButton } from "@/components/flexa/app-shell";
 import { Logo } from "@/components/flexa/logo";
 import { MovementRow } from "@/components/flexa/movement-row";
 import { Backdrop } from "@/components/flexa/shapes";
 import { Card, IconBox, SectionTitle } from "@/components/flexa/ui";
-import { money, movements, tips, worker } from "@/lib/mock";
+import { money, movements, photo, tips, worker } from "@/lib/mock";
 
 export default function WorkerHome() {
   const withdrawnPct = Math.round((worker.withdrawn / worker.earned) * 100);
@@ -19,9 +20,9 @@ export default function WorkerHome() {
         <Link
           href="/app/perfil"
           aria-label="Mi perfil"
-          className="grid size-10 place-items-center rounded-full bg-green-100 text-green-700 shadow-sm ring-4 ring-white/80 transition-transform active:scale-95"
+          className="size-10 overflow-hidden rounded-full shadow-sm ring-[3px] ring-white transition-transform active:scale-95"
         >
-          <UserRound className="size-5 stroke-[2.5]" />
+          <Image src={photo(worker.name)} alt="" width={80} height={80} priority className="size-full object-cover" />
         </Link>
       </header>
 
