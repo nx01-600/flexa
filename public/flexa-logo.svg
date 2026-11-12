@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 176 56" width="352" height="112" fill="none" stroke-width="5.5" stroke-linejoin="miter" role="img" aria-label="Flexa">
+  <style>
+    .ink { stroke: #1b2420; }
+    @media (prefers-color-scheme: dark) { .ink { stroke: #f2f5f3; } }
+  </style>
+  <g class="ink">
+    <path d="M4 16v36M4 18.75h22M4 34h18"/>
+    <path d="M36 16v33.25h21"/>
+    <path d="M91 18.75H69.75v30.5H91M69.75 34H87"/>
+    <path d="M101 16l26 36M127 16l-26 36"/>
+    <path d="M136 52l17-35 17 35"/>
+  </g>
+  <g stroke="#4fa95c" stroke-width="4" stroke-linecap="round">
+    <path d="M153 2.5v6.5"/>
+    <path d="M142.5 6l3.2 4.6"/>
+    <path d="M163.5 6l-3.2 4.6"/>
+  </g>
+</svg>
