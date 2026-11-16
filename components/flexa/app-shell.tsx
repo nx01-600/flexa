@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeftRight, ChartColumn, ChevronLeft, CircleHelp, House, LogOut, Menu, UserRound, X } from "@/components/flexa/icons";
+import { ArrowLeftRight, ChartColumn, ChevronLeft, CircleHelp, House, LayoutGrid, LogOut, Menu, UserRound, Wallet, X } from "@/components/flexa/icons";
 import { useState, type ReactNode } from "react";
 import { Logo } from "@/components/flexa/logo";
+import { logout } from "@/lib/api";
 import { IconBox } from "@/components/flexa/ui";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -71,7 +72,9 @@ export function TopBar({ title, back = "/app", action }: { title: string; back?:
 const menu = [
   { href: "/app", label: "Inicio", icon: House },
   { href: "/app/movimientos", label: "Movimientos", icon: ArrowLeftRight },
+  { href: "/app/salario", label: "Mi salario", icon: Wallet },
   { href: "/app/finanzas", label: "Mis finanzas", icon: ChartColumn },
+  { href: "/app/servicios", label: "Pagos y recargas", icon: LayoutGrid },
   { href: "/app/ayuda", label: "Ayuda", icon: CircleHelp },
 ];
 
@@ -118,12 +121,12 @@ export function MenuButton() {
             })}
           </nav>
           <div className="mt-auto px-3 pb-6">
-            <Link href="/app/login" className="flex h-14 items-center gap-3 rounded-md px-3 text-base font-bold text-danger transition-colors hover:bg-danger-soft">
+            <button type="button" onClick={() => logout("worker")} className="flex h-14 w-full items-center gap-3 rounded-md px-3 text-base font-bold text-danger transition-colors hover:bg-danger-soft">
               <IconBox tone="red" size="sm">
                 <LogOut />
               </IconBox>
               Cerrar sesión
-            </Link>
+            </button>
           </div>
         </SheetContent>
       </Sheet>

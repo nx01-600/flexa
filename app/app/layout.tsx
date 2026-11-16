@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { WorkerGuard } from "@/components/flexa/worker/guard";
 
 export const metadata: Metadata = { title: "Flexa" };
 
@@ -8,7 +10,11 @@ export const metadata: Metadata = { title: "Flexa" };
 export default function WorkerLayout({ children }: LayoutProps<"/app">) {
   return (
     <div className="min-h-dvh sm:bg-[#eef3ec]">
-      <div className="relative isolate mx-auto min-h-dvh max-w-[430px] overflow-x-clip bg-page sm:shadow-lg">{children}</div>
+      <div className="relative isolate mx-auto min-h-dvh max-w-[430px] overflow-x-clip bg-page sm:shadow-lg">
+        <Suspense>
+          <WorkerGuard>{children}</WorkerGuard>
+        </Suspense>
+      </div>
     </div>
   );
 }

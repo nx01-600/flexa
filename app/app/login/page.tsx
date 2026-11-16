@@ -18,6 +18,12 @@ export default function WorkerLogin() {
 
       <div className="mt-10 w-full max-w-[350px] pb-28">
         <LoginForm userLabel="Cédula" userPlaceholder="Cédula (CC/CE)" numeric to="/app" surface="worker" />
+        <p className="mt-6 text-sm font-medium text-ink-2">
+          ¿Primera vez en FLEXA?{" "}
+          <Link href="/app/registro" className="font-bold text-green-700 underline underline-offset-4 hover:text-green-900">
+            Crea tu cuenta
+          </Link>
+        </p>
       </div>
 
       <Link

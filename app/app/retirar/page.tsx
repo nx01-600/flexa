@@ -1,38 +1,77 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Building2, Lightbulb, Wallet } from "@/components/flexa/icons";
 import { useEffect, useRef, useState } from "react";
+import { Building2, Check, Lightbulb, Receipt as ReceiptIcon, Wallet } from "@/components/flexa/icons";
 import { TopBar } from "@/components/flexa/app-shell";
-import { Choice } from "@/components/flexa/choice";
 import { Backdrop } from "@/components/flexa/shapes";
-import { Button, Card, Field, IconBox, Input } from "@/components/flexa/ui";
-import { banks, money, worker } from "@/lib/mock";
+import { EmptyState, ErrorState, LoadingCards, Notice, Skeleton } from "@/components/flexa/worker/states";
+import { Timeline } from "@/components/flexa/worker/timeline";
+import { accountTypeLabel, statusOf, type Account, type Advance, type Earnings, type Simulation } from "@/components/flexa/worker/types";
+import { Badge, Button, ButtonLink, Card, IconBox } from "@/components/flexa/ui";
+import { api, ApiError, dateFmt, money, useApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-// ponytail: fixed threshold; the real rule (by profile and upcoming expenses) is pending from Flexa.
-const HIGH = 200_000;
-const quick = [50_000, 100_000, 200_000];
-
 export default function Withdraw() {
-  const router = useRouter();
   const reduce = useReducedMotion();
+  const earnings = useApi<Earnings>("/worker/earnings");
+  const accounts = useApi<Account[]>("/worker/accounts");
   const [amount, setAmount] = useState(0);
-  const [bank, setBank] = useState<string | null>(null);
-  const [account, setAccount] = useState("");
-  const [type, setType] = useState<string | null>(null);
-  const [warn, setWarn] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [sim, setSim] = useState<Simulation | null>(null);
+  const [simError, setSimError] = useState<string | null>(null);
+  const [simulating, setSimulating] = useState(false);
+  const [ackWarnings, setAckWarnings] = useState<string[] | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [done, setDone] = useState<Advance | null>(null);
 
-  const over = amount > worker.available;
-  const high = amount > HIGH && !over;
-  const pct = Math.min(amount / worker.available, 1);
-  const valid = amount >= 20_000 && !over && bank && account.length >= 6 && type;
+  // Live simulation, debounced so typing doesn't fire a request per keystroke.
+  useEffect(() => {
+    if (!amount) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      setSimulating(true);
+      api<Simulation>("/worker/simulate", { body: { amount } })
+        .then((s) => alive && (setSim(s), setSimError(null)))
+        .catch((e) => alive && setSimError(e instanceof ApiError ? e.message : "No pudimos simular el retiro."))
+        .finally(() => alive && setSimulating(false));
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [amount]);
 
-  const confirm = () => {
-    const q = new URLSearchParams({ monto: String(amount), banco: bank!, cuenta: account });
-    router.push(`/app/comprobante?${q}`);
+  const e = earnings.data;
+  const list = accounts.data ?? [];
+  const accountId = picked ?? list.find((a) => a.isDefault)?.id ?? list[0]?.id ?? null;
+  const current = sim && sim.amount === amount ? sim : null;
+  const ready = !!current?.valid && !!accountId && !simulating && !!e?.canRequest;
+  const pct = e?.available ? Math.min(amount / e.available, 1) : 0;
+  const over = current ? !current.valid : false;
+  const high = !!current?.overRecommended && !over;
+
+  const send = async (acknowledge: boolean) => {
+    setSending(true);
+    setSendError(null);
+    try {
+      const created = await api<Advance>("/worker/advances", { body: { amount, bankAccountId: accountId, ...(acknowledge ? { acknowledgeWarnings: true } : {}) } });
+      setAckWarnings(null);
+      setDone(created.events ? created : await api<Advance>(`/worker/advances/${created.id}`));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && err.body.code === "ACK_REQUIRED") setAckWarnings(err.body.warnings ?? current?.warnings ?? []);
+      else {
+        setAckWarnings(null);
+        setSendError(err instanceof ApiError ? err.message : "No pudimos enviar tu solicitud.");
+      }
+    } finally {
+      setSending(false);
+    }
   };
+
+  if (done) return <Result advance={done} />;
 
   const chip = (active: boolean) =>
     cn(
@@ -40,23 +79,44 @@ export default function Withdraw() {
       active ? "bg-btn-primary text-white shadow-btn" : "bg-surface text-ink shadow-sm ring-1 ring-line hover:bg-green-50",
     );
 
+  const quick = e ? [...new Set([e.recommended, 50_000, 100_000].filter((q) => q >= e.limits.minAmount && q <= e.available))].slice(0, 3) : [];
+
   return (
     <>
       <Backdrop variant="inner" />
       <TopBar title="Retirar" />
       <main className="flex flex-col gap-5 px-5 pt-3 pb-40">
-        <Card tone="mint" className="flex items-center gap-4 p-5">
-          <IconBox tone="dark" size="lg" className="shadow-[0_8px_18px_-8px_rgb(20_61_34/0.6)]">
-            <Wallet className="stroke-[2.5]" />
-          </IconBox>
-          <span className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold text-green-900">Saldo disponible</span>
-            <span className="text-[28px] leading-tight font-extrabold tracking-[-0.03em] text-ink tabular-nums">{money(worker.available)}</span>
-          </span>
-        </Card>
+        {earnings.error ? (
+          <ErrorState error={earnings.error} onRetry={earnings.reload} title="No pudimos consultar tu disponible" />
+        ) : (
+          <Card tone="mint" className="flex items-center gap-4 p-5">
+            <IconBox tone="dark" size="lg" className="shadow-[0_8px_18px_-8px_rgb(20_61_34/0.6)]">
+              <Wallet className="stroke-[2.5]" />
+            </IconBox>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-semibold text-green-900">Saldo disponible</span>
+              {e ? (
+                <span className="text-[28px] leading-tight font-extrabold tracking-[-0.03em] text-ink tabular-nums">{money(e.available)}</span>
+              ) : (
+                <Skeleton className="h-8 w-36" />
+              )}
+              {e && <span className="text-[13px] font-semibold text-green-900">Recomendado {money(e.recommended)}</span>}
+            </span>
+          </Card>
+        )}
+
+        {e && e.blockers.length > 0 && (
+          <Notice tone="warning" title="Por ahora no puedes retirar">
+            {e.blockers.map((b) => (
+              <span key={b}>{b}</span>
+            ))}
+          </Notice>
+        )}
 
         <Card className="flex flex-col gap-4 p-5">
-          <label htmlFor="amount" className="text-h3 text-ink">¿Cuánto quieres retirar?</label>
+          <label htmlFor="amount" className="text-h3 text-ink">
+            ¿Cuánto quieres retirar?
+          </label>
           <div
             className={cn(
               "flex items-center gap-1 rounded-md bg-page px-4 py-2 ring-[1.5px] transition-[box-shadow] duration-150 focus-within:ring-[2px]",
@@ -70,85 +130,181 @@ export default function Withdraw() {
               autoComplete="off"
               value={amount ? amount.toLocaleString("es-CO") : ""}
               placeholder="0"
-              onChange={(e) => setAmount(Number(e.target.value.replace(/\D/g, "").slice(0, 9)) || 0)}
+              disabled={!e?.canRequest}
+              onChange={(ev) => setAmount(Number(ev.target.value.replace(/\D/g, "").slice(0, 9)) || 0)}
               aria-invalid={over}
               aria-describedby="amount-help"
-              className="h-14 w-full bg-transparent text-[40px] font-extrabold tracking-[-0.03em] text-ink tabular-nums outline-none placeholder:text-ink-3"
+              className="h-14 w-full bg-transparent text-[40px] font-extrabold tracking-[-0.03em] text-ink tabular-nums outline-none placeholder:text-ink-3 disabled:opacity-50"
               style={{ outline: "none" }}
             />
           </div>
 
           <div className="flex flex-col gap-2">
-            <div className="h-2 overflow-hidden rounded-full bg-green-100">
+            <div className="relative h-2 overflow-hidden rounded-full bg-green-100">
               <motion.div
                 className={cn("h-full rounded-full", over ? "bg-danger" : high ? "bg-warning-icon" : "bg-linear-to-r from-green-400 to-green-600")}
                 animate={{ width: `${pct * 100}%` }}
                 transition={reduce ? { duration: 0 } : { type: "spring", duration: 0.5, bounce: 0 }}
               />
+              {e && e.available > 0 && (
+                <span aria-hidden className="absolute inset-y-0 w-0.5 bg-ink/40" style={{ left: `${Math.min(e.recommended / e.available, 1) * 100}%` }} title="Recomendado" />
+              )}
             </div>
-            <p id="amount-help" className={cn("text-[13px]", over ? "font-bold text-danger" : high ? "font-semibold text-warning" : "font-medium text-ink-2")}>
-              {over
-                ? `Supera tu disponible de ${money(worker.available)}.`
-                : high
-                  ? "Es más de dos tercios de tu disponible."
-                  : `Mínimo $20.000, máximo ${money(worker.available)}.`}
+            <p id="amount-help" aria-live="polite" className={cn("text-[13px]", over ? "font-bold text-danger" : high ? "font-semibold text-warning" : "font-medium text-ink-2")}>
+              {simError
+                ? simError
+                : current?.errors.length
+                  ? current.errors[0]
+                  : high
+                    ? `Supera el recomendado de ${money(current!.recommended)}.`
+                    : e
+                      ? `Mínimo ${money(e.limits.minAmount)}, máximo ${money(Math.min(e.available, e.limits.maxAmountPerRequest))}. La línea marca el recomendado.`
+                      : " "}
             </p>
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
-            {quick.map((q) => (
-              <button key={q} type="button" onClick={() => setAmount(q)} className={chip(amount === q)}>
-                {money(q)}
+          {e && e.available > 0 && (
+            <div className="grid grid-cols-4 gap-2">
+              {quick.map((q) => (
+                <button key={q} type="button" onClick={() => setAmount(q)} className={chip(amount === q)}>
+                  {money(q)}
+                </button>
+              ))}
+              <button type="button" onClick={() => setAmount(e.available)} className={chip(amount === e.available)}>
+                Todo
               </button>
-            ))}
-            <button type="button" onClick={() => setAmount(worker.available)} className={chip(amount === worker.available)}>
-              Todo
-            </button>
-          </div>
+            </div>
+          )}
         </Card>
 
-        <Card tone="soft" className="flex flex-col gap-4 p-5">
-          <h2 className="text-h3 text-ink">Datos de la transferencia</h2>
-          <Field label="Banco destinatario" htmlFor="bank">
-            <Choice id="bank" options={banks} value={bank} onChange={setBank} placeholder="Selecciona un banco" icon={Building2} className="data-[size=default]:h-13" />
-          </Field>
-          <Field label="Número de cuenta" htmlFor="account">
-            <Input id="account" inputMode="numeric" placeholder="Ingresa el número de cuenta" value={account} onChange={(e) => setAccount(e.target.value.replace(/[^\d ]/g, ""))} />
-          </Field>
-          <Field label="Tipo de cuenta" htmlFor="type">
-            <Choice id="type" options={["Ahorros", "Corriente", "Depósito electrónico"]} value={type} onChange={setType} className="data-[size=default]:h-13" />
-          </Field>
+        <Card tone="soft" className="flex flex-col gap-3 p-5">
+          <h2 className="text-h3 text-ink">¿A dónde lo enviamos?</h2>
+          {accounts.loading && !accounts.data ? (
+            <LoadingCards count={1} />
+          ) : accounts.error ? (
+            <ErrorState error={accounts.error} onRetry={accounts.reload} />
+          ) : list.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title="No tienes cuentas registradas"
+              text="Agrega una cuenta a tu nombre para recibir tus retiros."
+              action={
+                <ButtonLink href="/app/perfil?vista=cuentas" size="sm">
+                  Agregar cuenta
+                </ButtonLink>
+              }
+            />
+          ) : (
+            <div role="radiogroup" aria-label="Cuenta de destino" className="flex flex-col gap-2">
+              {list.map((a) => {
+                const active = a.id === accountId;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setPicked(a.id)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md bg-surface p-3 text-left ring-inset transition-[box-shadow,background-color] duration-150",
+                      active ? "bg-green-50 ring-2 ring-green-500" : "shadow-xs ring-1 ring-line hover:bg-green-50/60",
+                    )}
+                  >
+                    <IconBox size="sm" tone={active ? "dark" : "green"}>
+                      <Building2 />
+                    </IconBox>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="text-[15px] font-bold text-ink">{a.bank}</span>
+                      <span className="text-[13px] font-medium text-ink-3 tabular-nums">
+                        {accountTypeLabel[a.type]} · {a.number}
+                      </span>
+                    </span>
+                    {active && <Check weight="bold" className="size-5 text-green-600" />}
+                  </button>
+                );
+              })}
+              <Link href="/app/perfil?vista=cuentas" className="self-start text-sm font-bold text-green-700 underline-offset-4 hover:underline">
+                Gestionar cuentas
+              </Link>
+            </div>
+          )}
         </Card>
 
-        <Card tone="soft" className="p-5">
-          <dl className="flex flex-col gap-3 text-sm">
-            <div className="flex justify-between"><dt className="font-medium text-ink-2">Recibes</dt><dd className="text-base font-extrabold text-ink tabular-nums">{money(over ? 0 : amount)}</dd></div>
-            <div className="flex justify-between"><dt className="font-medium text-ink-2">Costo del retiro</dt><dd className="font-semibold text-ink-2">Por definir</dd></div>
-            <div className="flex justify-between border-t border-line-soft pt-3"><dt className="font-medium text-ink-2">Se descuenta en</dt><dd className="font-bold text-ink">Nómina del 15 nov</dd></div>
+        <Card tone="soft" className="p-5" aria-busy={simulating}>
+          <dl className={cn("flex flex-col gap-3 text-sm transition-opacity", simulating && "opacity-60")}>
+            <Row label="Recibes" value={money(current?.youReceive ?? 0)} strong />
+            <Row label="Costo del retiro" value={current ? (current.fee ? money(current.fee) : "Sin costo") : "—"} />
+            <Row label="Se descuenta de tu nómina" value={money(current?.toDiscountFromPayroll ?? 0)} />
+            <div className="flex flex-col gap-3 border-t border-line-soft pt-3">
+              <Row label={`Tu pago del ${current?.payDate ? dateFmt(current.payDate, { day: "numeric", month: "short" }) : e?.period ? dateFmt(e.period.payDate, { day: "numeric", month: "short" }) : "—"}`} value={current ? `${money(current.nextPayBefore)} → ${money(current.nextPayAfter)}` : e ? money(e.nextPayAfterUsage) : "—"} />
+              <Row label="Uso de tu tope" value={current ? `${current.usagePctAfter}%` : e ? `${e.usagePct}%` : "—"} />
+            </div>
           </dl>
+          {current && current.warnings.length > 0 && current.valid && (
+            <Notice tone="warning" className="mt-4" title="Ten en cuenta">
+              {current.warnings.map((w) => (
+                <span key={w}>{w}</span>
+              ))}
+            </Notice>
+          )}
+          {current && !current.overRecommended && current.valid && (
+            <p className="mt-4 flex items-center gap-2 text-[13px] font-bold text-green-700">
+              <Check weight="bold" className="size-4" />
+              Está dentro de tu monto recomendado.
+            </p>
+          )}
         </Card>
+
+        {sendError && <Notice tone="error">{sendError}</Notice>}
       </main>
 
       <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[430px] bg-linear-to-t from-page from-60% to-page/0 px-5 pt-8 pb-[max(16px,env(safe-area-inset-bottom))]">
-        <Button className="w-full" disabled={!valid} onClick={() => (amount > HIGH ? setWarn(true) : confirm())}>
-          Continuar
+        <Button className="w-full" disabled={!ready || sending} onClick={() => send(false)}>
+          {sending ? "Enviando..." : amount && current?.valid ? `Retirar ${money(amount)}` : "Continuar"}
         </Button>
       </div>
 
       <AnimatePresence>
-        {warn && <LiquidityWarning amount={amount} onConfirm={confirm} onClose={() => setWarn(false)} />}
+        {ackWarnings && (
+          <AckWarning amount={amount} recommended={current?.recommended ?? e?.recommended ?? 0} warnings={ackWarnings} busy={sending} onConfirm={() => send(true)} onClose={() => setAckWarnings(null)} />
+        )}
       </AnimatePresence>
     </>
   );
 }
 
-// Full-screen safety moment (mockup screen 10), not a sheet: the choice deserves the whole screen.
-function LiquidityWarning({ amount, onConfirm, onClose }: { amount: number; onConfirm: () => void; onClose: () => void }) {
+function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <dt className="font-medium text-ink-2">{label}</dt>
+      <dd className={cn("text-right tabular-nums", strong ? "text-base font-extrabold text-ink" : "font-bold text-ink")}>{value}</dd>
+    </div>
+  );
+}
+
+// Full-screen safety moment (mockup screen 10): the API asks the worker to acknowledge
+// the warnings explicitly before the request is created.
+function AckWarning({
+  amount,
+  recommended,
+  warnings,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  amount: number;
+  recommended: number;
+  warnings: string[];
+  busy: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
   const reduce = useReducedMotion();
-  const primary = useRef<HTMLButtonElement>(null);
+  const box = useRef<HTMLInputElement>(null);
+  const [ack, setAck] = useState(false);
 
   useEffect(() => {
-    primary.current?.focus();
+    box.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
@@ -168,38 +324,101 @@ function LiquidityWarning({ amount, onConfirm, onClose }: { amount: number; onCo
       animate={{ opacity: 1, scale: 1 }}
       exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
       transition={{ duration: reduce ? 0.01 : 0.2, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed inset-0 z-50 mx-auto isolate flex max-w-[430px] flex-col overflow-y-auto bg-warning-screen px-6 pt-[max(64px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))]"
+      className="fixed inset-0 z-50 mx-auto isolate flex max-w-[430px] flex-col overflow-y-auto bg-warning-screen px-6 pt-[max(48px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))]"
     >
       <Backdrop variant="warning" />
-      <div className="flex flex-col items-center gap-5 text-center">
-        <span className="grid size-28 place-items-center rounded-full bg-white/55 shadow-[0_16px_40px_-16px_rgb(201_61_61/0.45)] ring-8 ring-white/30">
-          <svg viewBox="0 0 24 24" className="size-16 drop-shadow-[0_4px_8px_rgb(201_61_61/0.35)]" aria-hidden>
+      <div className="flex flex-col items-center gap-4 text-center">
+        <span className="grid size-24 place-items-center rounded-full bg-white/55 shadow-[0_16px_40px_-16px_rgb(201_61_61/0.45)] ring-8 ring-white/30">
+          <svg viewBox="0 0 24 24" className="size-14 drop-shadow-[0_4px_8px_rgb(201_61_61/0.35)]" aria-hidden>
             <path d="M10.3 3.9a2 2 0 0 1 3.4 0l8.3 14.4a2 2 0 0 1-1.7 3H3.7a2 2 0 0 1-1.7-3z" fill="#e04848" />
             <path d="M12 9v5" stroke="#fff" strokeWidth={2.4} strokeLinecap="round" />
             <circle cx={12} cy={17.3} r={1.35} fill="#fff" />
           </svg>
         </span>
-        <h2 id="warn-title" className="text-[28px] leading-tight font-extrabold tracking-[-0.02em] text-danger">¡Atención!</h2>
-        <p className="max-w-[22ch] text-xl leading-snug font-bold text-ink text-balance">Este retiro podría afectar tu liquidez futura.</p>
-        <p id="warn-text" className="max-w-[32ch] text-[15px] font-medium text-ink-2">
-          Si retiras {money(amount)}, es posible que tengas menos disponibilidad para tus gastos esenciales en los próximos días.
+        <h2 id="warn-title" className="text-[28px] leading-tight font-extrabold tracking-[-0.02em] text-danger">
+          ¡Atención!
+        </h2>
+        <p id="warn-text" className="max-w-[26ch] text-lg leading-snug font-bold text-balance text-ink">
+          Antes de retirar {money(amount)}, revisa esto:
         </p>
       </div>
 
-      <Card className="mt-7 flex items-start gap-3 p-4">
-        <IconBox tone="amber">
-          <Lightbulb />
-        </IconBox>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[15px] font-bold text-ink">Recomendación</span>
-          <span className="text-sm font-medium text-ink-2">Considera un monto menor, por ejemplo {money(HIGH)}, para mantener un buen equilibrio financiero.</span>
-        </div>
+      <Card className="mt-6 flex flex-col gap-3 p-4">
+        <ul className="flex flex-col gap-2.5">
+          {warnings.map((w) => (
+            <li key={w} className="flex gap-2.5 text-sm font-medium text-ink">
+              <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-danger" />
+              {w}
+            </li>
+          ))}
+        </ul>
+        {amount > recommended && recommended > 0 && (
+          <div className="flex items-start gap-3 border-t border-line-soft pt-3">
+            <IconBox tone="amber" size="sm">
+              <Lightbulb />
+            </IconBox>
+            <span className="text-sm font-medium text-ink-2">Considera retirar {money(recommended)} o menos para proteger tu próximo pago.</span>
+          </div>
+        )}
       </Card>
 
+      <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-md bg-white/70 p-4 text-sm font-semibold text-ink ring-1 ring-white">
+        <input ref={box} type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[#c93d3d]" />
+        Leí las advertencias y entiendo que este valor se descontará de mi próximo pago de nómina.
+      </label>
+
       <div className="mt-auto flex flex-col gap-3 pt-8">
-        <Button ref={primary} variant="danger" onClick={onConfirm}>Entiendo y continuar</Button>
-        <Button variant="danger-outline" onClick={onClose}>Modificar monto</Button>
+        <Button variant="danger" onClick={onConfirm} disabled={!ack || busy}>
+          {busy ? "Enviando..." : "Entiendo y continuar"}
+        </Button>
+        <Button variant="danger-outline" onClick={onClose} disabled={busy}>
+          Modificar monto
+        </Button>
       </div>
     </motion.div>
+  );
+}
+
+function Result({ advance: a }: { advance: Advance }) {
+  const st = statusOf(a.status);
+  const paid = a.status === "DISBURSED";
+  return (
+    <>
+      <Backdrop variant="inner" wash />
+      <TopBar title="Tu retiro" />
+      <main className="flex flex-col gap-5 px-5 pt-3 pb-10">
+        <Card tone={paid ? "mint" : a.status === "FAILED" ? "red" : "amber"} className="flex flex-col items-center gap-2 p-6 text-center">
+          <span className="text-sm font-semibold text-ink-2">Solicitud {a.code}</span>
+          <span className="text-display text-ink tabular-nums">{money(a.amount)}</span>
+          <Badge tone={st.tone}>{st.label}</Badge>
+          <p className="mt-1 max-w-[30ch] text-sm font-medium text-ink-2">
+            {paid
+              ? `Enviado a ${a.bankAccount.bank} ${a.bankAccount.number}.`
+              : a.status === "EXCEPTION"
+                ? "Por su monto, tu empresa debe aprobarla. Te avisaremos en la Alarma FLEXA."
+                : a.status === "FAILED"
+                  ? "La transferencia no pasó. Ya creamos una incidencia para reintentarla."
+                  : "Estamos procesando tu solicitud."}
+          </p>
+        </Card>
+        <Card tone="soft" className="flex flex-col gap-4 p-5">
+          <h2 className="text-h3 text-ink">Estado</h2>
+          <Timeline events={a.events ?? []} status={a.status} />
+        </Card>
+        <div className="flex flex-col gap-2">
+          {paid ? (
+            <ButtonLink href={`/app/comprobante/${a.code}?nuevo=1`}>
+              <ReceiptIcon />
+              Ver comprobante
+            </ButtonLink>
+          ) : (
+            <ButtonLink href={`/app/solicitudes/${a.id}`}>Ver solicitud</ButtonLink>
+          )}
+          <ButtonLink href="/app" variant="ghost">
+            Volver al inicio
+          </ButtonLink>
+        </div>
+      </main>
+    </>
   );
 }
