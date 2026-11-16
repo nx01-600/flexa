@@ -242,8 +242,9 @@ export class EarningsService {
       usagePctAfter,
       valid: errors.length === 0,
       errors,
-      warnings,
-      requiresAcknowledgement: warnings.length > 0,
+      // Warnings only make sense for an amount that can actually be requested.
+      warnings: errors.length ? [] : warnings,
+      requiresAcknowledgement: errors.length === 0 && warnings.length > 0,
     };
   }
 }
