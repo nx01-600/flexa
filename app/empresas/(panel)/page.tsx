@@ -1,78 +1,102 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowUp, Banknote, CalendarClock, ChevronRight, FileSpreadsheet, FileText, HandCoins, Scale, Smartphone, TriangleAlert, Users } from "@/components/flexa/icons";
+import { useState } from "react";
+import { Banknote, CalendarClock, ChevronRight, HandCoins, Info, Smartphone, TriangleAlert, Users } from "@/components/flexa/icons";
 import { Bars } from "@/components/flexa/charts";
 import { PageHeader } from "@/components/flexa/company-shell";
+import { AdvanceBadge, Delta, EmptyState, ErrorState, Loading, PageLoading, pct, useCompanySession } from "@/components/flexa/empresas/kit";
+import type { Advance } from "@/components/flexa/empresas/types";
 import { Avatar, CardHead, Kpi, MoreLink } from "@/components/flexa/empresas-ui";
-import { Period } from "@/components/flexa/period";
 import { Blob } from "@/components/flexa/shapes";
 import { ButtonLink, Card, IconBox } from "@/components/flexa/ui";
-import { company, companyWeekly, employees, money } from "@/lib/mock";
+import { dateFmt, money, timeFmt, useApi } from "@/lib/api";
 
-const accessPct = Math.round((company.withAccess / company.activeWorkers) * 100);
+type Overview = {
+  period: { id: string; label: string; startDate: string; endDate: string; payDate: string } | null;
+  workers: { total: number; enabled: number; active: number; users: number };
+  payroll: { accumulated: number; projected: number; overtimeAmount: number; surcharges: number; budget: number | null };
+  ewa: { withdrawals: number; withdrawn: number; shareOfPayrollPct: number; vsPrevious: { withdrawn: number; withdrawals: number; changePct: number } | null };
+  attention: { level: string; title: string; detail: string }[];
+};
+type Summary = {
+  requests: number;
+  disbursedAmount: number;
+  averageAmount: number;
+  activeUsers: number;
+  enabledWorkers: number;
+  adoptionPct: number;
+  overRecommendedPct: number;
+  pendingExceptions: number;
+  openIncidents: number;
+};
+type Usage = { weekly: { week: string; value: number }[] };
 
-const notices = [
-  { icon: FileSpreadsheet, title: "Nómina del próximo periodo", sub: "Cargada · 15 oct 2026", href: "/empresas/nomina", tone: "green" as const },
-  { icon: Scale, title: "Rendimientos y conciliación", sub: "Todo al día", href: "/empresas/rendimientos", tone: "teal" as const },
-  { icon: TriangleAlert, title: "Alertas", sub: "3 trabajadores con uso alto de retiros", href: "/empresas/trabajadores", tone: "amber" as const },
-  { icon: FileText, title: "Reportes", sub: "Descarga tus reportes aquí", href: "/empresas/estadisticas", tone: "green" as const },
-];
-
-const recent = [
-  { name: employees[0].name, site: employees[0].site, amount: 200_000, when: "Hoy, 10:24 a. m." },
-  { name: employees[1].name, site: employees[1].site, amount: 150_000, when: "Hoy, 8:02 a. m." },
-  { name: employees[2].name, site: employees[2].site, amount: 120_000, when: "Ayer, 6:45 p. m." },
-  { name: employees[5].name, site: employees[5].site, amount: 50_000, when: "Ayer, 12:10 p. m." },
-];
+// Where each attention item takes the user.
+const attentionHref = (title: string) =>
+  /excepci/i.test(title) ? "/empresas/operaciones?status=EXCEPTION" : /incidenc/i.test(title) ? "/empresas/operaciones?tab=incidencias" : /nómina|faltan|inconsist/i.test(title) ? "/empresas/nomina" : /concilia/i.test(title) ? "/empresas/conciliacion" : "/empresas/trabajadores";
 
 export default function CompanyHome() {
-  const monthTotal = companyWeekly.reduce((a, w) => a + w.value, 0);
+  const session = useCompanySession();
+  const [now] = useState(Date.now);
+  const overview = useApi<Overview>("/analytics/overview");
+  const summary = useApi<Summary>("/company/ewa/summary");
+  const usage = useApi<Usage>("/analytics/usage");
+  const recent = useApi<Advance[]>("/company/advances");
+
+  if (overview.loading && !overview.data) return <PageLoading />;
+  if (overview.error || !overview.data) return <ErrorState error={overview.error} onRetry={overview.reload} />;
+  const o = overview.data;
+  const s = summary.data;
+  const accessPct = o.workers.total ? Math.round((o.workers.enabled / o.workers.total) * 100) : 0;
+  const p = o.period;
+  const day = p ? Math.min(Math.max(Math.ceil((now - +new Date(p.startDate)) / 86_400_000), 0), 31) : 0;
+  const days = p ? Math.round((+new Date(p.endDate) - +new Date(p.startDate)) / 86_400_000) + 1 : 30;
+  const first = session?.user.name.split(" ")[0];
+
   return (
     <>
-      <PageHeader
-        title={`¡Hola, ${company.name}!`}
-        sub="Aquí tienes un resumen de la actividad de tu empresa este mes."
-        action={<Period options={["Octubre 2026", "Septiembre 2026", "Agosto 2026"]} />}
-      />
+      <PageHeader title={first ? `¡Hola, ${first}!` : "Inicio"} sub={p ? `Resumen de la actividad de tu empresa en ${p.label}.` : "No hay un periodo de nómina abierto."} />
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <Kpi icon={Users} value={company.activeWorkers} label="Trabajadores activos" tone="green" />
-        <Kpi icon={Smartphone} value={company.withAccess} label="Con acceso a Flexa" tone="teal" trend={`${accessPct}%`} />
-        <Kpi icon={HandCoins} value={company.withdrawalsMonth} label="Retiros este mes" tone="amber" trend={<><ArrowUp className="size-3.5 stroke-[2.5]" />8%</>} />
-        <Kpi icon={Banknote} value={money(company.withdrawnMonth)} label="Total retirado este mes" tone="green" />
+        <Kpi icon={Users} value={o.workers.total} label="Trabajadores en nómina" tone="green" />
+        <Kpi icon={Smartphone} value={o.workers.enabled} label="Habilitados en Flexa" tone="teal" trend={`${accessPct}%`} />
+        <Kpi icon={HandCoins} value={o.ewa.withdrawals} label="Retiros del periodo" tone="amber" trend={o.ewa.vsPrevious ? <Delta value={o.ewa.vsPrevious.changePct} /> : undefined} />
+        <Kpi icon={Banknote} value={money(o.ewa.withdrawn)} label={`Retirado · ${pct(o.ewa.shareOfPayrollPct)} de la nómina`} tone="green" />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
         <Card className="flex flex-col gap-5 p-6">
-          <CardHead title="Retiros de los trabajadores" sub="Monto retirado por semana" href="/empresas/estadisticas" />
-          <div className="flex gap-8">
-            <div className="flex flex-col">
-              <span className="text-[13px] font-semibold text-ink-2">Total del mes</span>
-              <span className="text-[22px] font-extrabold tracking-[-0.03em] text-ink tabular-nums">{money(monthTotal)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[13px] font-semibold text-ink-2">Retiro promedio</span>
-              <span className="text-[22px] font-extrabold tracking-[-0.03em] text-ink tabular-nums">{money(company.withdrawnMonth / company.withdrawalsMonth)}</span>
-            </div>
+          <CardHead title="Retiros de los trabajadores" sub="Monto retirado por semana del periodo" href="/empresas/rendimientos" />
+          <div className="flex flex-wrap gap-8">
+            <Stat label="Total del periodo" value={money(o.ewa.withdrawn)} />
+            <Stat label="Retiro promedio" value={money(s?.averageAmount)} />
+            <Stat label="Usuarios activos" value={s ? `${s.activeUsers} · ${s.adoptionPct}%` : "—"} />
+            <Stat label="Sobre el recomendado" value={s ? pct(s.overRecommendedPct, 0) : "—"} />
           </div>
-          <Bars data={companyWeekly} x="week" height={250} highlightLast={false} />
+          {usage.error ? <ErrorState error={usage.error} onRetry={usage.reload} /> : usage.data ? <Bars data={usage.data.weekly} x="week" height={250} highlightLast={false} /> : <Loading rows={4} />}
         </Card>
 
         <Card className="flex flex-col gap-4 p-6">
-          <CardHead title="Información relevante" />
-          <ul className="flex flex-1 flex-col justify-between gap-2.5">
-            {notices.map(({ icon: Icon, title, sub, href, tone }) => (
-              <li key={title}>
-                <Link href={href} className="group flex items-center gap-3.5 rounded-md bg-[#f6faf5] p-3.5 transition-colors duration-150 hover:bg-mint-2">
-                  <IconBox tone={tone}><Icon /></IconBox>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-[15px] font-bold text-ink">{title}</span>
-                    <span className="truncate text-[13px] font-medium text-ink-2">{sub}</span>
-                  </span>
-                  <ChevronRight className="size-[18px] text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-green-700" />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <CardHead title="Para atender" sub="Lo que requiere acción de tu equipo" />
+          {o.attention.length ? (
+            <ul className="flex flex-1 flex-col gap-2.5">
+              {o.attention.map((a) => (
+                <li key={a.title}>
+                  <Link href={attentionHref(a.title)} className="group flex items-center gap-3.5 rounded-md bg-[#f6faf5] p-3.5 transition-colors duration-150 hover:bg-mint-2">
+                    <IconBox tone={a.level === "CRITICAL" ? "red" : a.level === "WARNING" ? "amber" : "teal"}>{a.level === "INFO" ? <Info /> : <TriangleAlert />}</IconBox>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="text-[15px] font-bold text-ink">{a.title}</span>
+                      <span className="text-[13px] font-medium text-ink-2">{a.detail}</span>
+                    </span>
+                    <ChevronRight className="size-[18px] text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-green-700" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState title="Todo al día" text="No hay excepciones, incidencias ni alertas pendientes." />
+          )}
         </Card>
       </div>
 
@@ -83,47 +107,79 @@ export default function CompanyHome() {
             <IconBox tone="dark" size="lg"><CalendarClock /></IconBox>
             <div className="flex flex-col">
               <span className="text-[13px] font-bold text-green-800">Próxima nómina</span>
-              <span className="text-h2 text-green-900">15 de noviembre</span>
+              <span className="text-h2 text-green-900">{p ? dateFmt(p.payDate, { day: "numeric", month: "long" }) : "Sin periodo abierto"}</span>
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between text-[13px] font-bold text-green-900">
-              <span>Periodo en curso</span>
-              <span className="tabular-nums">Día 15 de 30</span>
+          {p && (
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between text-[13px] font-bold text-green-900">
+                <span>Periodo {p.label}</span>
+                <span className="tabular-nums">Día {Math.min(day, days)} de {days}</span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-white/70" role="progressbar" aria-valuenow={day} aria-valuemax={days} aria-label="Avance del periodo">
+                <div className="h-full rounded-full bg-btn-primary" style={{ width: `${Math.min((day / days) * 100, 100)}%` }} />
+              </div>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-white/70">
-              <div className="h-full w-1/2 rounded-full bg-btn-primary" />
-            </div>
-          </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-md bg-white/80 p-3.5 shadow-xs">
-              <span className="text-[13px] font-semibold text-ink-2">A descontar</span>
-              <p className="text-lg font-extrabold tracking-[-0.02em] text-ink tabular-nums">{money(company.withdrawnMonth)}</p>
-            </div>
-            <div className="rounded-md bg-white/80 p-3.5 shadow-xs">
-              <span className="text-[13px] font-semibold text-ink-2">Trabajadores</span>
-              <p className="text-lg font-extrabold tracking-[-0.02em] text-ink tabular-nums">{company.withAccess}</p>
-            </div>
+            <MiniStat label="Devengado a hoy" value={money(o.payroll.accumulated)} />
+            <MiniStat label="Nómina proyectada" value={money(o.payroll.projected)} />
+            <MiniStat label="A compensar" value={money(o.ewa.withdrawn)} />
+            <MiniStat label="Presupuesto" value={o.payroll.budget ? money(o.payroll.budget) : "Sin definir"} />
           </div>
-          <ButtonLink href="/empresas/nomina" size="md">Cargar nómina</ButtonLink>
+          <ButtonLink href="/empresas/nomina" size="md">Ver estado de la nómina</ButtonLink>
         </Card>
 
         <Card className="flex flex-col gap-3 p-6">
-          <CardHead title="Últimos retiros" sub="Movimientos recientes de tus trabajadores" action={<MoreLink href="/empresas/trabajadores">Ver todos</MoreLink>} />
-          <ul className="flex flex-col">
-            {recent.map((r) => (
-              <li key={r.name + r.when} className="flex h-16 items-center gap-3.5 border-b border-line-soft last:border-0">
-                <Avatar name={r.name} className="size-10" />
-                <span className="flex flex-1 flex-col">
-                  <span className="text-[15px] font-bold text-ink">{r.name}</span>
-                  <span className="text-[13px] font-medium text-ink-2">Sede {r.site} · {r.when}</span>
-                </span>
-                <span className="text-[15px] font-bold text-ink tabular-nums">{money(r.amount)}</span>
-              </li>
-            ))}
-          </ul>
+          <CardHead title="Últimas solicitudes" sub="Movimientos recientes de tus trabajadores" action={<MoreLink href="/empresas/operaciones">Ver todas</MoreLink>} />
+          {recent.error ? (
+            <ErrorState error={recent.error} onRetry={recent.reload} />
+          ) : !recent.data ? (
+            <Loading rows={4} />
+          ) : !recent.data.length ? (
+            <EmptyState icon={HandCoins} title="Aún no hay solicitudes" text="Cuando tus trabajadores retiren su salario devengado aparecerán aquí." />
+          ) : (
+            <ul className="flex flex-col">
+              {recent.data.slice(0, 5).map((r) => {
+                const name = `${r.worker?.firstName} ${r.worker?.lastName}`;
+                return (
+                  <li key={r.id} className="border-b border-line-soft last:border-0">
+                    <Link href={`/empresas/operaciones/${r.id}`} className="-mx-2 flex h-16 items-center gap-3.5 rounded-md px-2 transition-colors hover:bg-mint-1">
+                      <Avatar name={name} className="size-10" />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-[15px] font-bold text-ink">{name}</span>
+                        <span className="text-[13px] font-medium text-ink-2">
+                          {r.worker?.site?.name ?? "Sin sede"} · {dateFmt(r.createdAt, { day: "numeric", month: "short" })}, {timeFmt(r.createdAt)}
+                        </span>
+                      </span>
+                      <AdvanceBadge value={r.status} />
+                      <span className="w-28 text-right text-[15px] font-bold text-ink tabular-nums">{money(r.amount)}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Card>
       </div>
     </>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[13px] font-semibold text-ink-2">{label}</span>
+      <span className="text-[22px] font-extrabold tracking-[-0.03em] text-ink tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-white/80 p-3.5 shadow-xs">
+      <span className="text-[13px] font-semibold text-ink-2">{label}</span>
+      <p className="text-lg font-extrabold tracking-[-0.02em] text-ink tabular-nums">{value}</p>
+    </div>
   );
 }
