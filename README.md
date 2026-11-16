@@ -19,21 +19,35 @@ It has two surfaces:
 
 ## Status
 
-This repository is the **frontend prototype**. It is not connected to any backend yet: every number on screen comes from mock data in [`lib/mock.ts`](lib/mock.ts).
+Full stack. The frontend talks to the **FLEXA API** in [`backend/`](backend/README.md) (NestJS + PostgreSQL + Prisma), which covers the 10 modules of the scope document and four roles:
+
+| Surface | Route | Role |
+|---|---|---|
+| Worker app | `/app` | Trabajador |
+| Flexa Empresas | `/empresas` | Talento Humano (admin) and Finanzas (read-only) |
+| Consola FLEXA | `/admin` | Administrador FLEXA |
 
 ## Run it
 
 ```bash
-npm install
-npm run dev
+# API (needs Docker for PostgreSQL)
+cd backend && npm install && docker compose up -d && cp .env.example .env
+npx prisma migrate dev && npx prisma db seed && npm run start:dev   # :4000
+
+# Frontend
+cd .. && npm install
+echo NEXT_PUBLIC_API_URL=http://localhost:4000/api > .env.local
+npm run dev   # :3000
 ```
 
-Then open `http://localhost:3000`.
+Demo accounts, password `Flexa2026!`: worker cédula `1234567890` (Valentina Torres), `rrhh@empresa.com`, `finanzas@empresa.com`, `admin@flexa.co`.
 
 ## Project structure
 
 ```
+backend/        FLEXA API (NestJS, Prisma, PostgreSQL)
 app/
+  admin/        FLEXA internal console
   app/          worker app (login, (tabs), retirar, comprobante, servicios, ayuda)
   empresas/     company panel (login, (panel)/nomina, trabajadores, estadisticas, ...)
   globals.css   design tokens (colors, radii, fonts)
@@ -41,23 +55,7 @@ components/
   flexa/        product components (Logo, BottomNav, Receipt, Kpi, Table, ...)
   ui/           shadcn/ui primitives (Base UI)
 lib/
-  mock.ts       simulated data, the contract the backend must replace
+  api.ts        API client, session per surface, useApi hook
+  mock.ts       legacy prototype data (only the avatar helper is still used)
 public/         logo, avatars, static assets
 ```
-
-## Backend: what is needed
-
-The backend should replace `lib/mock.ts` with a real API. The mock already describes the data the UI expects:
-
-- **Auth**: worker login and company login (separate roles).
-- **Worker**: profile, earned balance, available-to-withdraw amount, weekly earnings (`worker`, `weeklyEarned`).
-- **Withdrawals and movements**: create a withdrawal to a bank/wallet, list movements of type `retiro`, `pago`, `recarga` (`movements`, `banks`).
-- **Company**: company profile, sites, employees, team members (`company`, `sites`, `employees`, `team`).
-- **Payroll**: upload payroll files and track their processing (`payrollUploads`).
-- **Analytics**: weekly and monthly withdrawals, by category and by weekday (`companyWeekly`, `monthlyWithdrawn`, `categories`, `weekdayWithdrawals`).
-
-Suggested first step: expose these as REST endpoints with the same shapes as `lib/mock.ts`, so the frontend can switch from mock to API one screen at a time.
-
-## Stack
-
-Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn/ui on Base UI, Motion, Recharts, Phosphor and Lucide icons.
