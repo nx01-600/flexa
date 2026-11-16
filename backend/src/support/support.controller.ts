@@ -65,7 +65,7 @@ export class SupportController {
       include: {
         messages: { include: { author: { select: { name: true, role: true } } }, orderBy: { createdAt: 'asc' } },
         advance: { select: { code: true, amount: true, status: true } },
-        user: { select: { name: true, email: true, role: true } },
+        user: { select: { name: true, email: true, role: true, companyId: true } },
       },
     });
     if (!t) throw new NotFoundException('Solicitud de soporte no encontrada');
@@ -87,7 +87,7 @@ export class SupportController {
     const t = await this.one(u, id);
     if (u.role !== 'FLEXA_ADMIN' && dto.status !== 'CLOSED') throw new ForbiddenException('Solo puedes cerrar tu solicitud');
     await this.prisma.supportTicket.update({ where: { id: t.id }, data: { status: dto.status } });
-    await this.audit.log({ actorId: u.sub, companyId: u.companyId, entity: 'SupportTicket', entityId: t.id, action: `STATUS_${dto.status}` });
+    await this.audit.log({ actorId: u.sub, companyId: t.user.companyId, entity: 'SupportTicket', entityId: t.id, action: `STATUS_${dto.status}` });
     return { ok: true };
   }
 }

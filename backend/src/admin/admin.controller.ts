@@ -6,6 +6,7 @@ import { AuditService } from '../common/audit.service.js';
 import { type AuthUser, CurrentUser, Roles } from '../common/auth.js';
 import { sum } from '../common/util.js';
 import { AdvancesService } from '../ewa/advances.service.js';
+import { OnboardingService } from '../ewa/worker.controller.js';
 
 class CompanyDto {
   @IsString() name: string;
@@ -44,6 +45,7 @@ export class AdminController {
     private prisma: PrismaService,
     private audit: AuditService,
     private advances: AdvancesService,
+    private onboarding: OnboardingService,
   ) {}
 
   @Get('overview')
@@ -67,7 +69,7 @@ export class AdminController {
         disbursed: disbursed?._count ?? 0,
         disbursedAmount: disbursed?._sum.amount ?? 0,
         failed,
-        successRatePct: disbursed ? Math.round((disbursed._count / (disbursed._count + failed)) * 100) : 0,
+        successRatePct: disbursed || failed ? Math.round(((disbursed?._count ?? 0) / ((disbursed?._count ?? 0) + failed)) * 100) : null,
         byStatus: Object.fromEntries(adv.map((a) => [a.status, a._count])),
       },
       openIncidents: incidents,
@@ -156,7 +158,7 @@ export class AdminController {
     if (dto.status === 'RESOLVED' && !dto.resolution) throw new BadRequestException('Describe la resolución');
     const i = await this.prisma.incident.update({
       where: { id },
-      data: { status: dto.status, resolution: dto.resolution, ...(dto.status === 'RESOLVED' ? { resolvedById: u.sub, resolvedAt: new Date() } : {}) },
+      data: { status: dto.status, resolution: dto.resolution, ...(dto.status === 'RESOLVED' ? { resolvedById: u.sub, resolvedAt: new Date() } : { resolvedById: null, resolvedAt: null }) },
     });
     await this.audit.log({ actorId: u.sub, companyId: i.companyId, entity: 'Incident', entityId: id, action: `FLEXA_${dto.status}`, data: dto });
     return i;
@@ -188,7 +190,11 @@ export class AdminController {
 
   @Post('kyc/:workerId')
   async kycDecision(@CurrentUser() u: AuthUser, @Param('workerId') workerId: string, @Body() dto: KycDecisionDto) {
+    const pending = await this.prisma.worker.findUnique({ where: { id: workerId } });
+    if (!pending) throw new NotFoundException('Trabajador no encontrado');
+    if (pending.kycStatus !== 'MANUAL_REVIEW') throw new BadRequestException('El trabajador no está en revisión manual');
     const w = await this.prisma.worker.update({ where: { id: workerId }, data: { kycStatus: dto.status } });
+    await this.onboarding.refresh(workerId);
     await this.prisma.kycCheck.create({ data: { workerId, type: 'MANUAL_REVIEW', status: dto.status, provider: 'FLEXA', detail: dto.note } });
     await this.audit.log({ actorId: u.sub, companyId: w.companyId, entity: 'Worker', entityId: workerId, action: `KYC_${dto.status}`, data: { note: dto.note } });
     return w;

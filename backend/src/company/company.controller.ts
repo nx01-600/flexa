@@ -233,7 +233,12 @@ export class CompanyController {
     return this.upsertWorker(companyId, u.sub, dto, true);
   }
 
+  private async checkSite(companyId: string, siteId?: string) {
+    if (siteId && !(await this.prisma.site.findFirst({ where: { id: siteId, companyId } }))) throw new BadRequestException('Sede no válida');
+  }
+
   private async upsertWorker(companyId: string, actorId: string, dto: WorkerDto, failIfExists = false) {
+    await this.checkSite(companyId, dto.siteId);
     const exists = await this.prisma.worker.findUnique({ where: { companyId_docNumber: { companyId, docNumber: dto.docNumber } } });
     if (exists && failIfExists) throw new ConflictException('Ya existe un trabajador con ese documento');
     const data = {
@@ -296,6 +301,7 @@ export class CompanyController {
     const companyId = requireCompany(u);
     const before = await this.prisma.worker.findFirst({ where: { id, companyId } });
     if (!before) throw new NotFoundException('Trabajador no encontrado');
+    await this.checkSite(companyId, dto.siteId);
     const worker = await this.prisma.worker.update({
       where: { id },
       data: { ...dto, ...(dto.status === 'RETIRED' ? { enabled: false } : {}) },
@@ -319,9 +325,18 @@ export class CompanyController {
 
   @Roles(...ADMIN) @Post('workers/access')
   async bulkToggle(@CurrentUser() u: AuthUser, @Body() dto: { ids: string[]; enabled: boolean; reason?: string }) {
-    const out = [];
-    for (const id of dto.ids ?? []) out.push(await this.toggle(u, id, { enabled: dto.enabled, reason: dto.reason ?? 'Cambio masivo' }));
-    return { updated: out.length };
+    if (!Array.isArray(dto?.ids) || typeof dto.enabled !== 'boolean') throw new BadRequestException('Envía ids y enabled');
+    let updated = 0;
+    const errors: { id: string; message: string }[] = [];
+    for (const id of dto.ids) {
+      try {
+        await this.toggle(u, id, { enabled: dto.enabled, reason: dto.reason ?? 'Cambio masivo' });
+        updated++;
+      } catch (e) {
+        errors.push({ id, message: e instanceof Error ? e.message : 'Error' });
+      }
+    }
+    return { updated, errors };
   }
 
   // ---------- Incidencias y novedades de operación ----------
@@ -349,7 +364,7 @@ export class CompanyController {
     if (dto.status === 'RESOLVED' && !dto.resolution) throw new BadRequestException('Describe cómo se resolvió');
     const r = await this.prisma.incident.updateMany({
       where: { id, companyId },
-      data: { status: dto.status, resolution: dto.resolution, ...(dto.status === 'RESOLVED' ? { resolvedById: u.sub, resolvedAt: new Date() } : {}) },
+      data: { status: dto.status, resolution: dto.resolution, ...(dto.status === 'RESOLVED' ? { resolvedById: u.sub, resolvedAt: new Date() } : { resolvedById: null, resolvedAt: null }) },
     });
     if (!r.count) throw new NotFoundException('Incidencia no encontrada');
     await this.audit.log({ actorId: u.sub, companyId, entity: 'Incident', entityId: id, action: dto.status, data: dto });
