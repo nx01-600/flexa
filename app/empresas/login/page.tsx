@@ -31,7 +31,7 @@ export default function CompanyLogin() {
             <p className="mt-1 text-xl font-semibold text-green-900">Empresas</p>
             <h1 className="mt-7 text-[28px] leading-tight font-extrabold tracking-[-0.02em] text-ink">Bienvenido</h1>
             <p className="mt-1.5 mb-7 text-[15px] font-medium text-ink-2">Ingresa a tu cuenta para continuar.</p>
-            <LoginForm userLabel="Usuario" userPlaceholder="Usuario (NIT o correo corporativo)" to="/empresas" size="xl" />
+            <LoginForm userLabel="Usuario" userPlaceholder="Usuario (NIT o correo corporativo)" to="/empresas" surface="company" size="xl" />
           </div>
         </section>
       </div>

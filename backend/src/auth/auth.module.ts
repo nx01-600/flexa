@@ -18,7 +18,8 @@ import { type AuthUser, CurrentUser, Public } from '../common/auth.js';
 import type { User } from '../generated/prisma/client.js';
 
 class LoginDto {
-  @IsEmail() email: string;
+  // Email, or the document number for workers (the app asks for the cédula)
+  @IsString() email: string;
   @IsString() password: string;
   // Optional: restrict the login surface ("worker" app vs "company" panel vs "admin")
   @IsOptional() @IsString() surface?: 'worker' | 'company' | 'admin';
@@ -57,8 +58,12 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    const id = dto.email.trim().toLowerCase();
+    const byDoc = id.includes('@')
+      ? null
+      : await this.prisma.worker.findFirst({ where: { docNumber: id.replace(/\D/g, ''), userId: { not: null } } });
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+      where: byDoc ? { id: byDoc.userId! } : { email: id },
       include: { worker: { select: { id: true } } },
     });
     if (!user || !user.active || !(await bcrypt.compare(dto.password, user.passwordHash))) {

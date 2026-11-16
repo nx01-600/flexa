@@ -17,7 +17,7 @@ export default function WorkerLogin() {
       </div>
 
       <div className="mt-10 w-full max-w-[350px] pb-28">
-        <LoginForm userLabel="Cédula" userPlaceholder="Cédula (CC/CE)" numeric to="/app" />
+        <LoginForm userLabel="Cédula" userPlaceholder="Cédula (CC/CE)" numeric to="/app" surface="worker" />
       </div>
 
       <Link
