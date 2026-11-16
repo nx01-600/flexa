@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
+import { PrismaErrorsFilter } from './common/prisma-errors.filter.js';
 
 // BigInt (period budgets) is not JSON-serializable by default.
 (BigInt.prototype as unknown as { toJSON: () => number }).toJSON = function () {
@@ -13,6 +14,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api');
   app.enableCors({ origin: (process.env.CORS_ORIGIN ?? 'http://localhost:3000').split(','), credentials: true });
+  app.useGlobalFilters(new PrismaErrorsFilter());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const docs = new DocumentBuilder()
