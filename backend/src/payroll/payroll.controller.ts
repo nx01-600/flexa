@@ -192,7 +192,9 @@ export class PayrollController {
   @Roles(...COMPANY) @Patch('periods/:id/budget')
   async budget(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: { budget: number }) {
     const companyId = requireCompany(u);
-    const r = await this.prisma.payrollPeriod.updateMany({ where: { id, companyId }, data: { budget: BigInt(Math.round(Number(dto.budget))) } });
+    const budget = Number(dto?.budget);
+    if (!Number.isFinite(budget) || budget < 0) throw new BadRequestException('Presupuesto inválido');
+    const r = await this.prisma.payrollPeriod.updateMany({ where: { id, companyId }, data: { budget: BigInt(Math.round(budget)) } });
     if (!r.count) throw new NotFoundException('Periodo no encontrado');
     await this.audit.log({ actorId: u.sub, companyId, entity: 'PayrollPeriod', entityId: id, action: 'BUDGET_SET', data: { budget: dto.budget } });
     return { ok: true };

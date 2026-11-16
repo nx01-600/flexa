@@ -56,6 +56,11 @@ export class CompensationController {
       _sum: { amount: true, fee: true },
       _count: true,
     });
+    const paid = await this.prisma.servicePayment.groupBy({
+      by: ['periodId'],
+      where: { status: 'COMPLETED', worker: { companyId }, periodId: { in: open.map((o) => o.periodId) } },
+      _sum: { amount: true },
+    });
     const lines = await this.prisma.compensationLine.findMany({
       where: { period: { companyId }, status: { in: ['PENDING', 'PARTIAL', 'DIFFERENCE'] } },
       include: { period: { select: { label: true } }, worker: { select: { firstName: true, lastName: true, docNumber: true } } },
@@ -67,7 +72,7 @@ export class CompensationController {
         label: periods.find((p) => p.id === o.periodId)?.label,
         status: periods.find((p) => p.id === o.periodId)?.status,
         advances: o._count,
-        toCompensate: (o._sum.amount ?? 0) + (o._sum.fee ?? 0),
+        toCompensate: (o._sum.amount ?? 0) + (o._sum.fee ?? 0) + (paid.find((p) => p.periodId === o.periodId)?._sum.amount ?? 0),
       })),
       openLines: lines,
       totalPending: sum(lines, (l) => l.toCompensate - l.compensatedAmount),
@@ -102,7 +107,7 @@ export class CompensationController {
         await tx.compensationLine.upsert({
           where: { periodId_workerId: { periodId: id, workerId } },
           create: { periodId: id, workerId, advancesCount: t.count, advancedTotal: t.amount, feesTotal: t.fees, toCompensate: t.amount + t.fees, difference: t.amount + t.fees },
-          update: { advancesCount: t.count, advancedTotal: t.amount, feesTotal: t.fees, toCompensate: t.amount + t.fees },
+          update: { advancesCount: t.count, advancedTotal: t.amount, feesTotal: t.fees, toCompensate: t.amount + t.fees, compensatedAmount: 0, difference: t.amount + t.fees, status: 'PENDING', note: null },
         });
       }
       const total = sum([...byWorker.values()], (t) => t.amount + t.fees);
@@ -110,7 +115,7 @@ export class CompensationController {
       await tx.reconciliation.upsert({
         where: { periodId: id },
         create: { companyId, periodId: id, status: byWorker.size ? 'IN_PROGRESS' : 'RECONCILED', disbursedTotal: total, differenceTotal: total },
-        update: { disbursedTotal: total, status: 'IN_PROGRESS' },
+        update: { disbursedTotal: total, compensatedTotal: 0, differenceTotal: total, status: 'IN_PROGRESS', closedAt: null, closedBy: null },
       });
       await this.audit.log({ actorId: u.sub, companyId, entity: 'PayrollPeriod', entityId: id, action: 'CLOSED', data: { workers: byWorker.size, total } }, tx);
     });
@@ -187,6 +192,10 @@ export class CompensationController {
     if (!items.length) throw new BadRequestException('Envía los valores descontados');
 
     const lines = await this.prisma.compensationLine.findMany({ where: { periodId: id }, include: { worker: true } });
+    // Lines the company doesn't report go back to pending with their full value as difference.
+    const reported = new Set(items.map((i) => String(i.docNumber).replace(/\D/g, '')));
+    for (const l of lines.filter((l) => !reported.has(l.worker.docNumber.replace(/\D/g, ''))))
+      await this.prisma.compensationLine.update({ where: { id: l.id }, data: { compensatedAmount: 0, difference: l.toCompensate, status: 'PENDING' } });
     const unknown: string[] = [];
     for (const item of items) {
       const line = lines.find((l) => l.worker.docNumber.replace(/\D/g, '') === String(item.docNumber).replace(/\D/g, ''));
@@ -200,7 +209,6 @@ export class CompensationController {
         data: { compensatedAmount: item.amount, difference, status: difference === 0 ? 'APPLIED' : item.amount === 0 ? 'PENDING' : difference > 0 ? 'PARTIAL' : 'DIFFERENCE' },
       });
     }
-    // Lines the company didn't report stay pending with their full value as difference.
     const reconciliation = await this.refresh(companyId, id);
     if (reconciliation.differenceTotal !== 0)
       await this.prisma.incident.create({
@@ -215,8 +223,9 @@ export class CompensationController {
   @Roles(...ADMIN) @Patch('lines/:id')
   async fixLine(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: LineFixDto) {
     const companyId = requireCompany(u);
-    const line = await this.prisma.compensationLine.findFirst({ where: { id, period: { companyId } } });
+    const line = await this.prisma.compensationLine.findFirst({ where: { id, period: { companyId } }, include: { period: true } });
     if (!line) throw new NotFoundException('Línea no encontrada');
+    if (line.period.status === 'RECONCILED') throw new BadRequestException('El periodo ya está conciliado');
     const difference = line.toCompensate - dto.compensatedAmount;
     const updated = await this.prisma.compensationLine.update({
       where: { id },
