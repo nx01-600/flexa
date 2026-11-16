@@ -111,21 +111,23 @@ export async function download(path: string, filename: string, surface?: Surface
 export function useApi<T>(path: string | null, surface?: Surface) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
-  const [loading, setLoading] = useState(!!path);
   const [tick, setTick] = useState(0);
+  // Loading is derived: the request key that last finished differs from the current one.
+  const current = path ? `${surface ?? ""}|${path}|${tick}` : null;
+  const [done, setDone] = useState<string | null>(null);
+  const loading = current !== null && done !== current;
 
   useEffect(() => {
-    if (!path) return;
+    if (!path || !current) return;
     let alive = true;
-    setLoading(true);
     api<T>(path, { surface })
       .then((d) => alive && (setData(d), setError(null)))
       .catch((e) => alive && setError(e instanceof ApiError ? e : new ApiError(String(e), 0)))
-      .finally(() => alive && setLoading(false));
+      .finally(() => alive && setDone(current));
     return () => {
       alive = false;
     };
-  }, [path, surface, tick]);
+  }, [path, surface, current]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
   return { data, error, loading, reload, setData };
