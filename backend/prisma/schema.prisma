@@ -1,0 +1,565 @@
+// FLEXA: earned wage access B2B2C. One schema covering the 10 functional modules.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Users and roles ----------
+
+enum Role {
+  WORKER
+  COMPANY_ADMIN // Talento Humano / Nómina
+  COMPANY_FINANCE // Usuario financiero / administrativo
+  FLEXA_ADMIN // Rol interno FLEXA
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  worker    Worker?
+
+  tickets       SupportTicket[]
+  ticketReplies TicketMessage[]
+  auditLogs     AuditLog[]
+  resolvedCases Incident[]       @relation("IncidentResolver")
+}
+
+// ---------- Company (client) ----------
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+  ONBOARDING
+}
+
+enum IntegrationType {
+  FILE
+  ERP_API
+}
+
+enum IntegrationStatus {
+  OK
+  DEGRADED
+  DOWN
+  NOT_CONFIGURED
+}
+
+model Company {
+  id                String            @id @default(cuid())
+  name              String
+  nit               String            @unique
+  status            CompanyStatus     @default(ACTIVE)
+  pricePerWorker    Int               @default(9900) // suscripción mensual por trabajador habilitado (COP)
+  integrationType   IntegrationType   @default(FILE)
+  integrationStatus IntegrationStatus @default(OK)
+  erpName           String?
+  apiKey            String?           @unique // para que el ERP envíe nómina
+  lastSyncAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  settings       CompanySettings?
+  users          User[]
+  sites          Site[]
+  workers        Worker[]
+  periods        PayrollPeriod[]
+  uploads        PayrollUpload[]
+  incidents      Incident[]
+  reconciliations Reconciliation[]
+  auditLogs      AuditLog[]
+}
+
+// Parámetros generales del servicio (módulo 5) y reglas EWA (módulo 7)
+model CompanySettings {
+  id                   String  @id @default(cuid())
+  companyId            String  @unique
+  company              Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  maxAdvancePct        Int     @default(50) // % del devengado neto que se puede anticipar
+  recommendedPct       Int     @default(25) // % del devengado sugerido (referencia, no límite)
+  minAmount            Int     @default(20000)
+  maxAmountPerRequest  Int     @default(1000000)
+  maxRequestsPerPeriod Int     @default(4)
+  feePerRequest        Int     @default(0) // comisión al trabajador por retiro (0 = la paga la empresa)
+  blackoutDaysBeforePay Int    @default(2) // días antes del pago sin solicitudes
+  alarmUsagePct        Int     @default(70) // Alarma FLEXA: % del disponible usado
+  alarmRequestsCount   Int     @default(3) // Alarma FLEXA: nº solicitudes en el periodo
+  exceptionAmount      Int     @default(800000) // solicitudes >= este valor pasan a excepción
+  payFrequency         PayFrequency @default(MONTHLY)
+}
+
+enum PayFrequency {
+  BIWEEKLY
+  MONTHLY
+}
+
+model Site {
+  id        String   @id @default(cuid())
+  name      String
+  city      String
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workers   Worker[]
+
+  @@unique([companyId, name])
+}
+
+// ---------- Worker (módulo 1 y 5) ----------
+
+enum WorkerStatus {
+  INVITED // cargado por la empresa, sin registro
+  PENDING_KYC
+  ACTIVE
+  DISABLED
+  RETIRED
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  REJECTED
+  MANUAL_REVIEW
+}
+
+model Worker {
+  id           String       @id @default(cuid())
+  companyId    String
+  company      Company      @relation(fields: [companyId], references: [id])
+  userId       String?      @unique
+  user         User?        @relation(fields: [userId], references: [id])
+  siteId       String?
+  site         Site?        @relation(fields: [siteId], references: [id])
+  docType      String       @default("CC")
+  docNumber    String
+  firstName    String
+  lastName     String
+  email        String
+  phone        String?
+  position     String?
+  contractType String       @default("INDEFINIDO")
+  hireDate     DateTime?
+  baseSalary   Int // mensual COP
+  enabled      Boolean      @default(true) // habilitado por la empresa
+  status       WorkerStatus @default(INVITED)
+  kycStatus    KycStatus    @default(NOT_STARTED)
+  disabledReason String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  kycChecks      KycCheck[]
+  consents       Consent[]
+  accounts       BankAccount[]
+  payrollEntries PayrollEntry[]
+  novelties      PayrollNovelty[]
+  advances       Advance[]
+  payments       ServicePayment[]
+  alerts         Alert[]
+  compensations  CompensationLine[]
+  incidents      Incident[]
+  documents      Document[]
+
+  @@unique([companyId, docNumber])
+}
+
+model KycCheck {
+  id          String    @id @default(cuid())
+  workerId    String
+  worker      Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  provider    String    @default("FLEXA-KYC-SANDBOX")
+  type        String // DOCUMENT | SELFIE_BIOMETRIC | ANTIFRAUD
+  status      KycStatus
+  score       Float?
+  providerRef String?
+  detail      String?
+  createdAt   DateTime  @default(now())
+}
+
+model LegalDocument {
+  id        String    @id @default(cuid())
+  type      String // TERMS | DATA_POLICY | PAYROLL_DEDUCTION_AUTH
+  version   String
+  title     String
+  body      String
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  consents  Consent[]
+
+  @@unique([type, version])
+}
+
+model Consent {
+  id         String        @id @default(cuid())
+  workerId   String
+  worker     Worker        @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  documentId String
+  document   LegalDocument @relation(fields: [documentId], references: [id])
+  acceptedAt DateTime      @default(now())
+  ip         String?
+
+  @@unique([workerId, documentId])
+}
+
+enum AccountType {
+  SAVINGS
+  CHECKING
+  WALLET
+}
+
+model BankAccount {
+  id        String      @id @default(cuid())
+  workerId  String
+  worker    Worker      @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  bank      String
+  type      AccountType
+  number    String
+  holder    String
+  isDefault Boolean     @default(false)
+  verified  Boolean     @default(false)
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  advances  Advance[]
+}
+
+// ---------- Payroll (módulo 6) ----------
+
+enum PeriodStatus {
+  OPEN
+  CLOSED // nómina liquidada, se genera compensación
+  COMPENSATED
+  RECONCILED
+}
+
+model PayrollPeriod {
+  id         String       @id @default(cuid())
+  companyId  String
+  company    Company      @relation(fields: [companyId], references: [id])
+  label      String // "Nov 2026"
+  startDate  DateTime
+  endDate    DateTime
+  payDate    DateTime
+  status     PeriodStatus @default(OPEN)
+  budget     BigInt? // presupuesto de nómina (para presupuesto vs ejecución)
+  createdAt  DateTime     @default(now())
+  closedAt   DateTime?
+
+  entries        PayrollEntry[]
+  uploads        PayrollUpload[]
+  advances       Advance[]
+  compensations  CompensationLine[]
+  reconciliation Reconciliation?
+  novelties      PayrollNovelty[]
+
+  @@unique([companyId, startDate])
+}
+
+model PayrollEntry {
+  id             String        @id @default(cuid())
+  periodId       String
+  period         PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  workerId       String
+  worker         Worker        @relation(fields: [workerId], references: [id])
+  baseSalary     Int
+  workedDays     Int           @default(0) // días trabajados reportados a la fecha
+  overtimeHours  Float         @default(0)
+  overtimeAmount Int           @default(0)
+  surcharges     Int           @default(0) // recargos nocturnos/dominicales
+  deductions     Int           @default(0) // salud, pensión, embargos, etc.
+  netPay         Int?          // neto liquidado al cierre
+  uploadId       String?
+  upload         PayrollUpload? @relation(fields: [uploadId], references: [id])
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([periodId, workerId])
+}
+
+enum UploadStatus {
+  PROCESSING
+  PROCESSED
+  WITH_ISSUES
+  FAILED
+}
+
+model PayrollUpload {
+  id         String         @id @default(cuid())
+  companyId  String
+  company    Company        @relation(fields: [companyId], references: [id])
+  periodId   String
+  period     PayrollPeriod  @relation(fields: [periodId], references: [id])
+  source     IntegrationType
+  fileName   String
+  status     UploadStatus   @default(PROCESSING)
+  totalRows  Int            @default(0)
+  okRows     Int            @default(0)
+  uploadedBy String?
+  createdAt  DateTime       @default(now())
+  issues     PayrollIssue[]
+  entries    PayrollEntry[]
+}
+
+model PayrollIssue {
+  id         String        @id @default(cuid())
+  uploadId   String
+  upload     PayrollUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  row        Int
+  docNumber  String?
+  field      String
+  message    String
+  severity   String        @default("ERROR") // ERROR | WARNING
+  resolved   Boolean       @default(false)
+  resolvedAt DateTime?
+}
+
+model PayrollNovelty {
+  id          String        @id @default(cuid())
+  periodId    String
+  period      PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  workerId    String
+  worker      Worker        @relation(fields: [workerId], references: [id])
+  type        String // INCAPACIDAD | VACACIONES | LICENCIA | AUSENCIA | RETIRO | AJUSTE_SALARIO | HORAS_EXTRA
+  description String
+  days        Int           @default(0)
+  amount      Int           @default(0)
+  date        DateTime      @default(now())
+  createdBy   String?
+}
+
+// ---------- EWA advances (módulos 3, 4, 7) ----------
+
+enum AdvanceStatus {
+  REQUESTED
+  EXCEPTION // requiere intervención
+  APPROVED
+  DISBURSING
+  DISBURSED
+  REJECTED
+  FAILED
+  CANCELLED
+}
+
+model Advance {
+  id                String        @id @default(cuid())
+  code              String        @unique // número legible para comprobantes
+  workerId          String
+  worker            Worker        @relation(fields: [workerId], references: [id])
+  periodId          String
+  period            PayrollPeriod @relation(fields: [periodId], references: [id])
+  bankAccountId     String
+  bankAccount       BankAccount   @relation(fields: [bankAccountId], references: [id])
+  amount            Int
+  fee               Int           @default(0)
+  netAmount         Int
+  status            AdvanceStatus @default(REQUESTED)
+  availableAtRequest   Int
+  recommendedAtRequest Int
+  overRecommended   Boolean       @default(false)
+  warningAcknowledged Boolean     @default(false)
+  exceptionReason   String?
+  providerRef       String?
+  fundingRef        String?
+  disbursedAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  events    AdvanceEvent[]
+  incidents Incident[]
+  tickets   SupportTicket[]
+}
+
+model AdvanceEvent {
+  id        String        @id @default(cuid())
+  advanceId String
+  advance   Advance       @relation(fields: [advanceId], references: [id], onDelete: Cascade)
+  status    AdvanceStatus
+  note      String?
+  actor     String? // SYSTEM | userId
+  createdAt DateTime      @default(now())
+}
+
+// Pagos de servicios / recargas desde el disponible (app del trabajador)
+model ServicePayment {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  workerId  String
+  worker    Worker   @relation(fields: [workerId], references: [id])
+  kind      String // PAGO | RECARGA
+  category  String // Servicios públicos, Telefonía, ...
+  biller    String
+  reference String
+  amount    Int
+  periodId  String
+  status    String   @default("COMPLETED")
+  createdAt DateTime @default(now())
+}
+
+enum AlertLevel {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model Alert {
+  id        String     @id @default(cuid())
+  workerId  String
+  worker    Worker     @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  type      String // USAGE_THRESHOLD | REQUEST_COUNT | OVER_RECOMMENDED | DISBURSED | PERIOD_SUMMARY
+  level     AlertLevel @default(INFO)
+  title     String
+  message   String
+  read      Boolean    @default(false)
+  createdAt DateTime   @default(now())
+}
+
+// ---------- Compensation & reconciliation (módulo 8) ----------
+
+enum CompensationStatus {
+  PENDING
+  APPLIED
+  PARTIAL
+  DIFFERENCE
+}
+
+model CompensationLine {
+  id                String             @id @default(cuid())
+  periodId          String
+  period            PayrollPeriod      @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  workerId          String
+  worker            Worker             @relation(fields: [workerId], references: [id])
+  advancesCount     Int
+  advancedTotal     Int // desembolsado (bruto)
+  feesTotal         Int
+  toCompensate      Int // lo que se debe descontar en nómina
+  compensatedAmount Int                @default(0) // lo que la empresa reporta como descontado
+  difference        Int                @default(0)
+  status            CompensationStatus @default(PENDING)
+  note              String?
+  updatedAt         DateTime           @updatedAt
+
+  @@unique([periodId, workerId])
+}
+
+enum ReconciliationStatus {
+  PENDING
+  IN_PROGRESS
+  WITH_DIFFERENCES
+  RECONCILED
+}
+
+model Reconciliation {
+  id                String               @id @default(cuid())
+  companyId         String
+  company           Company              @relation(fields: [companyId], references: [id])
+  periodId          String               @unique
+  period            PayrollPeriod        @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  status            ReconciliationStatus @default(PENDING)
+  disbursedTotal    Int                  @default(0)
+  compensatedTotal  Int                  @default(0)
+  differenceTotal   Int                  @default(0)
+  closedAt          DateTime?
+  closedBy          String?
+  updatedAt         DateTime             @updatedAt
+}
+
+// ---------- Incidents, support, documents, audit (módulos 5, 7, 10) ----------
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  ESCALATED // escalada a FLEXA
+  RESOLVED
+}
+
+model Incident {
+  id          String         @id @default(cuid())
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id])
+  workerId    String?
+  worker      Worker?        @relation(fields: [workerId], references: [id])
+  advanceId   String?
+  advance     Advance?       @relation(fields: [advanceId], references: [id])
+  category    String // ADVANCE_EXCEPTION | PAYROLL_DATA | RECONCILIATION | INTEGRATION | DISBURSEMENT_FAILED
+  title       String
+  description String
+  status      IncidentStatus @default(OPEN)
+  resolution  String?
+  resolvedById String?
+  resolvedBy  User?          @relation("IncidentResolver", fields: [resolvedById], references: [id])
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_USER
+  CLOSED
+}
+
+model SupportTicket {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  userId      String
+  user        User            @relation(fields: [userId], references: [id])
+  advanceId   String?
+  advance     Advance?        @relation(fields: [advanceId], references: [id])
+  category    String
+  subject     String
+  description String
+  status      TicketStatus    @default(OPEN)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  messages    TicketMessage[]
+}
+
+model TicketMessage {
+  id        String        @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime      @default(now())
+}
+
+// Comprobantes y certificados generados para el trabajador
+model Document {
+  id        String   @id @default(cuid())
+  workerId  String
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  type      String // RECEIPT | CONSENT | STATEMENT
+  title     String
+  refId     String?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  entity    String
+  entityId  String?
+  action    String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entity, entityId])
+}

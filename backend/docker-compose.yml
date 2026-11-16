@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: flexa
+      POSTGRES_PASSWORD: flexa
+      POSTGRES_DB: flexa
+    ports:
+      - "5433:5432"
+    volumes:
+      - flexa-pg:/var/lib/postgresql/data
+volumes:
+  flexa-pg:
