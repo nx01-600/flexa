@@ -7,10 +7,10 @@ Backend de FLEXA: NestJS 12 + PostgreSQL + Prisma 7. Cubre los 10 módulos del d
 ```bash
 cd backend
 npm install
-docker compose up -d          # PostgreSQL en localhost:5433
+npm run db:up                 # PostgreSQL en localhost:5433
 cp .env.example .env
-npx prisma migrate dev        # crea el esquema
-npx prisma db seed            # datos de demo
+npm run db:migrate            # crea el esquema
+npm run db:seed               # datos de demo (npm run db:reset para empezar de cero)
 npm run start:dev             # http://localhost:4000/api  ·  Swagger en /api/docs
 ```
 
