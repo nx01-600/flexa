@@ -31,7 +31,8 @@ Full stack. The frontend talks to the **FLEXA API** in [`backend/`](backend/READ
 
 ```bash
 # API (needs Docker for PostgreSQL)
-cd backend && npm install && docker compose up -d && cp .env.example .env
+# .env must exist BEFORE npm install: the postinstall step (prisma generate) reads DATABASE_URL from it.
+cd backend && cp .env.example .env && npm install && docker compose up -d
 npx prisma migrate dev && npx prisma db seed && npm run start:dev   # :4000
 
 # Frontend
@@ -41,6 +42,8 @@ npm run dev   # :3000
 ```
 
 Demo accounts, password `Flexa2026!`: worker cédula `1234567890` (Valentina Torres), `rrhh@empresa.com`, `finanzas@empresa.com`, `admin@flexa.co`.
+
+Workers sign up with their cédula, the corporate email their company loaded and a password. `/auth/login` and `/auth/register` are rate limited (`THROTTLE_LIMIT` per minute per IP, default 20). See [`backend/README.md`](backend/README.md) for all environment variables.
 
 ## Project structure
 

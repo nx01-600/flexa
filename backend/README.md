@@ -6,13 +6,28 @@ Backend de FLEXA: NestJS 12 + PostgreSQL + Prisma 7. Cubre los 10 módulos del d
 
 ```bash
 cd backend
+cp .env.example .env          # before npm install: the postinstall step (prisma generate) reads DATABASE_URL
 npm install
 npm run db:up                 # PostgreSQL en localhost:5433
-cp .env.example .env
 npm run db:migrate            # crea el esquema
 npm run db:seed               # datos de demo (npm run db:reset para empezar de cero)
-npm run start:dev             # http://localhost:4000/api  ·  Swagger en /api/docs
+npm run start:dev             # http://localhost:4000/api  ·  Swagger en /api/docs (NODE_ENV=development only)
 ```
+
+### Environment variables
+
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string. Required, also for `npm install` (the `postinstall` step runs `prisma generate`). |
+| `JWT_SECRET` | Required, at least 16 characters. The API refuses to start without it, and unless `NODE_ENV` is `development` or `test` it also refuses the placeholder from `.env.example`. |
+| `THROTTLE_LIMIT` | Attempts per minute per IP on `/auth/login` and `/auth/register` (default 20). Raise it for e2e tests. No other route is rate limited. |
+| `PORT`, `CORS_ORIGIN` | Port (4000) and comma-separated allowed origins. |
+| `NODE_ENV` | `development` (or `test`) is the explicit opt-in for dev conveniences: the placeholder `JWT_SECRET` is accepted. It also turns on Swagger at `/api/docs`. Unset counts as production. |
+| `ALLOW_SEED` | `1` lets `db:seed` run against a non-local database. Never works with `NODE_ENV=production`. |
+
+The seed `TRUNCATE`s every table, so it refuses to run unless the `DATABASE_URL` host is `localhost`, `127.0.0.1` or `postgres` (or `ALLOW_SEED=1`).
+
+The JWT guard looks the user up on every request: a deactivated user, or one whose role or company changed, loses access immediately (401) instead of keeping a 12 h token.
 
 Cuentas de demo (contraseña `Flexa2026!` para todas):
 
@@ -45,8 +60,8 @@ documentos terminados en `000` → KYC en revisión manual; cuentas terminadas e
 ### Auth
 | Método | Ruta | |
 |---|---|---|
-| POST | `/auth/login` | `{email, password, surface?: worker\|company\|admin}` → `{accessToken, user}` |
-| POST | `/auth/register` | Trabajador habilitado: `{docNumber, email, password, phone?}` |
+| POST | `/auth/login` | `{email, password, surface?: worker\|company\|admin}` → `{accessToken, user}`. `email` may be the cédula (digits only or dotted); if the cédula exists in more than one company the API answers 400 and asks for the email. |
+| POST | `/auth/register` | Enabled worker only: `{docNumber, email, password, phone?}` → `{accessToken, user}`. The cédula is compared as digits. |
 | GET | `/auth/me` | |
 
 ### Trabajador (`WORKER`) — módulos 1, 2, 3, 4, 10
