@@ -4,6 +4,7 @@ import {
   ConflictException,
   Controller,
   Get,
+  HttpException,
   NotFoundException,
   Param,
   Patch,
@@ -13,15 +14,16 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../common/audit.service.js';
 import { type AuthUser, CurrentUser, Roles, requireCompany } from '../common/auth.js';
-import { parseCsv, sum } from '../common/util.js';
+import { INT_MAX, csvUpload, exceedsVariance, parseAmount, parseCsv, sum } from '../common/util.js';
 import { EarningsService } from '../ewa/earnings.service.js';
 import { AdvancesService } from '../ewa/advances.service.js';
+import { AdvanceStatus, IncidentStatus, WorkerStatus } from '../generated/prisma/enums.js';
 
 class WorkerDto {
   @IsString() docNumber: string;
@@ -49,7 +51,7 @@ class ToggleDto {
   @IsBoolean() enabled: boolean;
   @IsOptional() @IsString() reason?: string;
 }
-class SettingsDto {
+export class SettingsDto {
   @IsOptional() @IsInt() @Min(0) @Max(100) maxAdvancePct?: number;
   @IsOptional() @IsInt() @Min(0) @Max(100) recommendedPct?: number;
   @IsOptional() @IsInt() @Min(0) minAmount?: number;
@@ -61,6 +63,14 @@ class SettingsDto {
   @IsOptional() @IsInt() @Min(1) alarmRequestsCount?: number;
   @IsOptional() @IsInt() @Min(0) exceptionAmount?: number;
   @IsOptional() @IsIn(['BIWEEKLY', 'MONTHLY']) payFrequency?: 'BIWEEKLY' | 'MONTHLY';
+}
+class ToggleTeamDto {
+  @IsBoolean() active: boolean;
+}
+class BulkToggleDto {
+  @IsArray() @ArrayMaxSize(500) @IsString({ each: true }) ids: string[];
+  @IsBoolean() enabled: boolean;
+  @IsOptional() @IsString() reason?: string;
 }
 class SiteDto {
   @IsString() name: string;
@@ -89,6 +99,51 @@ class DecisionDto {
 
 const ADMIN = ['COMPANY_ADMIN'] as const;
 const COMPANY = ['COMPANY_ADMIN', 'COMPANY_FINANCE'] as const;
+const MAX_UPLOAD_ROWS = 5000;
+
+// Validates a query-string value against a Prisma enum: unknown values answer 400 instead of reaching Prisma.
+export function enumParam<T extends string>(allowed: Record<string, T>, value: string | undefined, label = 'Estado'): T | undefined {
+  if (value === undefined || value === '') return undefined;
+  if (!Object.values(allowed).includes(value as T)) throw new BadRequestException(`${label} no válido`);
+  return value as T;
+}
+
+function dateParam(value: string | undefined, label: string) {
+  if (!value) return undefined;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) throw new BadRequestException(`${label} no válida`);
+  return d;
+}
+
+// Keeps only the keys the caller really sent: with ES2023 class fields, omitted DTO keys are own `undefined`
+// properties, so spreading the DTO over the stored values would overwrite them and skip the cross-field checks.
+// Returns the patch to store after validating the merged result; shared with the FLEXA admin endpoint.
+export function checkSettingsUpdate(
+  before: { maxAdvancePct: number; recommendedPct: number; minAmount: number; maxAmountPerRequest: number },
+  dto: SettingsDto,
+) {
+  const patch = Object.fromEntries(Object.entries(dto).filter(([, v]) => v != null)) as Partial<SettingsDto>;
+  const next = { ...before, ...patch };
+  if (next.maxAdvancePct < 0 || next.maxAdvancePct > 100) throw new BadRequestException('El tope debe estar entre 0 y 100 %');
+  if (next.recommendedPct > next.maxAdvancePct) throw new BadRequestException('El recomendado no puede superar el tope');
+  if (next.minAmount > next.maxAmountPerRequest) throw new BadRequestException('El mínimo no puede superar el máximo por solicitud');
+  return patch;
+}
+
+// Company staff only sees the last 4 digits of a worker's destination account.
+export const maskAccount = (number: string) => (number.length > 4 ? `****${number.slice(-4)}` : '****');
+
+// advances.detail() (also the tail of approve/reject/retry) carries the full account number: mask it before replying.
+export function maskDetail<T>(a: T): T {
+  const acc = (a as { bankAccount?: { number?: string } | null } | null)?.bankAccount;
+  return acc?.number ? { ...a, bankAccount: { ...acc, number: maskAccount(acc.number) } } : a;
+}
+
+// Cédulas (and any numeric document) are stored digits-only so login and registration match them.
+export function normalizeWorkerDoc(docNumber: string, docType = 'CC') {
+  const doc = docNumber.trim();
+  return docType.toUpperCase() === 'CC' || /^[\d.,\s-]+$/.test(doc) ? doc.replace(/\D/g, '') : doc;
+}
 
 @Controller('company')
 export class CompanyController {
@@ -122,11 +177,9 @@ export class CompanyController {
   async updateSettings(@CurrentUser() u: AuthUser, @Body() dto: SettingsDto) {
     const companyId = requireCompany(u);
     const before = await this.earnings.settings(companyId);
-    const next = { ...before, ...dto };
-    if (next.recommendedPct > next.maxAdvancePct) throw new BadRequestException('El recomendado no puede superar el tope');
-    if (next.minAmount > next.maxAmountPerRequest) throw new BadRequestException('El mínimo no puede superar el máximo por solicitud');
-    const settings = await this.prisma.companySettings.update({ where: { companyId }, data: dto });
-    await this.audit.log({ actorId: u.sub, companyId, entity: 'CompanySettings', entityId: settings.id, action: 'UPDATED', data: { before, after: dto } });
+    const patch = checkSettingsUpdate(before, dto);
+    const settings = await this.prisma.companySettings.update({ where: { companyId }, data: patch });
+    await this.audit.log({ actorId: u.sub, companyId, entity: 'CompanySettings', entityId: settings.id, action: 'UPDATED', data: { before, after: patch } });
     return settings;
   }
 
@@ -161,10 +214,11 @@ export class CompanyController {
   }
 
   @Roles(...ADMIN) @Patch('team/:id')
-  async toggleTeam(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: { active: boolean }) {
+  async toggleTeam(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: ToggleTeamDto) {
     const companyId = requireCompany(u);
-    if (id === u.sub) throw new BadRequestException('No puedes desactivar tu propio usuario');
-    const r = await this.prisma.user.updateMany({ where: { id, companyId }, data: { active: !!dto.active } });
+    if (!dto.active && id === u.sub) throw new BadRequestException('No puedes desactivar tu propio usuario');
+    // Only staff accounts: worker users share the companyId but are managed through workers/:id/access.
+    const r = await this.prisma.user.updateMany({ where: { id, companyId, role: { in: [...COMPANY] } }, data: { active: dto.active } });
     if (!r.count) throw new NotFoundException('Usuario no encontrado');
     await this.audit.log({ actorId: u.sub, companyId, entity: 'User', entityId: id, action: dto.active ? 'ACTIVATED' : 'DEACTIVATED' });
     return { ok: true };
@@ -184,7 +238,7 @@ export class CompanyController {
     const workers = await this.prisma.worker.findMany({
       where: {
         companyId,
-        ...(status ? { status: status as never } : {}),
+        ...(status ? { status: enumParam(WorkerStatus, status) } : {}),
         ...(siteId ? { siteId } : {}),
         ...(enabled ? { enabled: enabled === 'true' } : {}),
         ...(q
@@ -239,7 +293,9 @@ export class CompanyController {
 
   private async upsertWorker(companyId: string, actorId: string, dto: WorkerDto, failIfExists = false) {
     await this.checkSite(companyId, dto.siteId);
-    const exists = await this.prisma.worker.findUnique({ where: { companyId_docNumber: { companyId, docNumber: dto.docNumber } } });
+    const docNumber = normalizeWorkerDoc(dto.docNumber, dto.docType);
+    if (!docNumber) throw new BadRequestException('Documento no válido');
+    const exists = await this.prisma.worker.findUnique({ where: { companyId_docNumber: { companyId, docNumber } } });
     if (exists && failIfExists) throw new ConflictException('Ya existe un trabajador con ese documento');
     const data = {
       docType: dto.docType ?? 'CC',
@@ -255,41 +311,60 @@ export class CompanyController {
     };
     const worker = exists
       ? await this.prisma.worker.update({ where: { id: exists.id }, data })
-      : await this.prisma.worker.create({ data: { ...data, companyId, docNumber: dto.docNumber } });
+      : await this.prisma.worker.create({ data: { ...data, companyId, docNumber } });
     await this.audit.log({ actorId, companyId, entity: 'Worker', entityId: worker.id, action: exists ? 'UPDATED' : 'CREATED', data: { baseSalary: dto.baseSalary } });
     return worker;
   }
 
   // Bulk load: CSV with documento,nombres,apellidos,correo,salario[,cargo,sede,telefono,contrato]
   @Roles(...ADMIN) @Post('workers/upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', csvUpload))
   async uploadWorkers(@CurrentUser() u: AuthUser, @UploadedFile() file?: { buffer: Buffer; originalname: string }) {
     const companyId = requireCompany(u);
     if (!file) throw new BadRequestException('Adjunta un archivo CSV en el campo "file"');
+    // A renamed binary (e.g. .xlsx) contains NUL bytes; plain CSV text never does.
+    if (!/\.csv$/i.test(file.originalname) || file.buffer.includes(0)) throw new BadRequestException('El archivo debe ser un CSV');
     const rows = parseCsv(file.buffer.toString('utf8'));
+    if (rows.length > MAX_UPLOAD_ROWS) throw new BadRequestException(`El archivo supera el máximo de ${MAX_UPLOAD_ROWS} filas`);
     const sites = await this.prisma.site.findMany({ where: { companyId } });
     const result = { created: 0, updated: 0, errors: [] as { row: number; message: string }[] };
     for (const [i, r] of rows.entries()) {
       const doc = r.documento ?? r.doc ?? r.cedula;
-      const salary = Number((r.salario ?? r.salary ?? '').replace(/\D/g, ''));
+      const rawSalary = r.salario ?? r.salary;
       const email = r.correo ?? r.email;
-      if (!doc || !email || !salary || !(r.nombres ?? r.nombre)) {
+      if (!doc || !email || !rawSalary?.trim() || !(r.nombres ?? r.nombre)) {
         result.errors.push({ row: i + 2, message: 'Faltan documento, nombres, correo o salario' });
         continue;
       }
-      const existed = await this.prisma.worker.findUnique({ where: { companyId_docNumber: { companyId, docNumber: doc } } });
+      const salary = parseAmount(rawSalary);
+      if (salary === null || salary <= 0 || salary > INT_MAX) {
+        result.errors.push({ row: i + 2, message: 'Salario inválido' });
+        continue;
+      }
+      const docNumber = normalizeWorkerDoc(doc);
+      const existed = docNumber ? await this.prisma.worker.findUnique({ where: { companyId_docNumber: { companyId, docNumber } } }) : null;
+      // Same guard as payroll ingest: a salary far from the registered one is not applied from a bulk file.
+      if (existed && exceedsVariance(salary, existed.baseSalary)) {
+        result.errors.push({ row: i + 2, message: `Variación mayor al 30 % frente al salario registrado (${existed.baseSalary}); no se aplicó, corrígelo manualmente si es correcto` });
+        continue;
+      }
       const site = sites.find((s) => [s.name.toLowerCase(), s.city.toLowerCase()].includes((r.sede ?? '').toLowerCase()));
-      await this.upsertWorker(companyId, u.sub, {
-        docNumber: doc,
-        firstName: r.nombres ?? r.nombre,
-        lastName: r.apellidos ?? '',
-        email,
-        baseSalary: salary,
-        position: r.cargo,
-        phone: r.telefono,
-        contractType: r.contrato,
-        siteId: site?.id,
-      });
+      try {
+        await this.upsertWorker(companyId, u.sub, {
+          docNumber,
+          firstName: r.nombres ?? r.nombre,
+          lastName: r.apellidos ?? '',
+          email,
+          baseSalary: salary,
+          position: r.cargo,
+          phone: r.telefono,
+          contractType: r.contrato,
+          siteId: site?.id,
+        });
+      } catch (e) {
+        result.errors.push({ row: i + 2, message: e instanceof HttpException ? e.message : 'No se pudo guardar la fila' });
+        continue;
+      }
       if (existed) result.updated++;
       else result.created++;
     }
@@ -324,8 +399,7 @@ export class CompanyController {
   }
 
   @Roles(...ADMIN) @Post('workers/access')
-  async bulkToggle(@CurrentUser() u: AuthUser, @Body() dto: { ids: string[]; enabled: boolean; reason?: string }) {
-    if (!Array.isArray(dto?.ids) || typeof dto.enabled !== 'boolean') throw new BadRequestException('Envía ids y enabled');
+  async bulkToggle(@CurrentUser() u: AuthUser, @Body() dto: BulkToggleDto) {
     let updated = 0;
     const errors: { id: string; message: string }[] = [];
     for (const id of dto.ids) {
@@ -344,7 +418,7 @@ export class CompanyController {
   @Roles(...COMPANY) @Get('incidents')
   incidents(@CurrentUser() u: AuthUser, @Query('status') status?: string, @Query('category') category?: string) {
     return this.prisma.incident.findMany({
-      where: { companyId: requireCompany(u), ...(status ? { status: status as never } : {}), ...(category ? { category } : {}) },
+      where: { companyId: requireCompany(u), ...(status ? { status: enumParam(IncidentStatus, status) } : {}), ...(category ? { category } : {}) },
       include: { worker: { select: { firstName: true, lastName: true, docNumber: true } }, advance: { select: { code: true, amount: true, status: true } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -353,6 +427,8 @@ export class CompanyController {
   @Roles(...ADMIN) @Post('incidents')
   async createIncident(@CurrentUser() u: AuthUser, @Body() dto: IncidentDto) {
     const companyId = requireCompany(u);
+    if (dto.workerId && !(await this.prisma.worker.findFirst({ where: { id: dto.workerId, companyId }, select: { id: true } }))) throw new NotFoundException('Trabajador no encontrado');
+    if (dto.advanceId && !(await this.prisma.advance.findFirst({ where: { id: dto.advanceId, worker: { companyId } }, select: { id: true } }))) throw new NotFoundException('Solicitud no encontrada');
     const incident = await this.prisma.incident.create({ data: { ...dto, companyId } });
     await this.audit.log({ actorId: u.sub, companyId, entity: 'Incident', entityId: incident.id, action: 'CREATED' });
     return incident;
@@ -382,13 +458,15 @@ export class CompanyController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
+    const gte = dateParam(from, 'Fecha inicial');
+    const lte = dateParam(to, 'Fecha final');
     return this.prisma.advance.findMany({
       where: {
         worker: { companyId: requireCompany(u) },
-        ...(status ? { status: status as never } : {}),
+        ...(status ? { status: enumParam(AdvanceStatus, status) } : {}),
         ...(periodId ? { periodId } : {}),
         ...(workerId ? { workerId } : {}),
-        ...(from || to ? { createdAt: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}),
+        ...(gte || lte ? { createdAt: { ...(gte ? { gte } : {}), ...(lte ? { lte } : {}) } } : {}),
       },
       include: {
         worker: { select: { firstName: true, lastName: true, docNumber: true, site: { select: { name: true } } } },
@@ -407,22 +485,22 @@ export class CompanyController {
     const owner = await this.prisma.worker.findFirst({ where: { id: a.workerId, companyId: requireCompany(u) } });
     if (!owner) throw new NotFoundException('Solicitud no encontrada');
     const audit = await this.prisma.auditLog.findMany({ where: { entity: 'Advance', entityId: id }, orderBy: { createdAt: 'asc' } });
-    return { ...a, audit };
+    return { ...maskDetail(a), audit };
   }
 
   @Roles(...ADMIN) @Post('advances/:id/approve')
-  approve(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: DecisionDto) {
-    return this.advances.resolveException(requireCompany(u), id, u.sub, true, dto.note);
+  async approve(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: DecisionDto) {
+    return maskDetail(await this.advances.resolveException(requireCompany(u), id, u.sub, true, dto.note));
   }
 
   @Roles(...ADMIN) @Post('advances/:id/reject')
-  reject(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: DecisionDto) {
-    return this.advances.resolveException(requireCompany(u), id, u.sub, false, dto.note);
+  async reject(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: DecisionDto) {
+    return maskDetail(await this.advances.resolveException(requireCompany(u), id, u.sub, false, dto.note));
   }
 
   @Roles(...ADMIN) @Post('advances/:id/retry')
-  retry(@CurrentUser() u: AuthUser, @Param('id') id: string) {
-    return this.advances.retry(requireCompany(u), id, u.sub);
+  async retry(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return maskDetail(await this.advances.retry(requireCompany(u), id, u.sub));
   }
 
   // Aggregated EWA usage + the rules applied (what HR supervises without approving each request).

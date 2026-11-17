@@ -14,6 +14,14 @@ const UNPAID_NOVELTIES = ['AUSENCIA', 'LICENCIA_NO_REMUNERADA', 'SUSPENSION'];
 
 export type Snapshot = Awaited<ReturnType<EarningsService['snapshot']>>;
 
+// Stable code per blocker so callers can drop one rule without matching on the user-facing text.
+export type BlockerCode = 'NO_PERIOD' | 'COMPANY_SUSPENDED' | 'WORKER_DISABLED' | 'KYC' | 'CONSENTS' | 'ACCOUNT' | 'BLACKOUT' | 'REQUEST_LIMIT';
+export type Blocker = { code: BlockerCode; message: string };
+
+// Service payments are not advance requests: every blocker applies except the per-period request cap.
+export const paymentBlockers = (s: { blockerDetails: Blocker[] }) =>
+  s.blockerDetails.filter((b) => b.code !== 'REQUEST_LIMIT').map((b) => b.message);
+
 // Módulo 2: salary of the period, earned to date, available and recommended amounts.
 @Injectable()
 export class EarningsService {
@@ -48,11 +56,13 @@ export class EarningsService {
     const period = await this.currentPeriod(worker.companyId, tx, at);
 
     if (!period) {
+      const blockerDetails: Blocker[] = [{ code: 'NO_PERIOD', message: 'La empresa no tiene un periodo de nómina abierto' }];
       return {
         worker,
         settings,
         period: null,
-        blockers: ['La empresa no tiene un periodo de nómina abierto'],
+        blockers: blockerDetails.map((b) => b.message),
+        blockerDetails,
         ...this.empty(worker.baseSalary),
       };
     }
@@ -100,13 +110,14 @@ export class EarningsService {
     );
     const nextPayAfterUsage = projectedNet - used;
 
-    const blockers = this.blockers({ worker, settings, period, at, requests: advances.length });
+    const blockerDetails = this.blockers({ worker, settings, period, at, requests: advances.length });
 
     return {
       worker,
       settings,
       period,
-      blockers,
+      blockers: blockerDetails.map((b) => b.message),
+      blockerDetails,
       baseSalary,
       periodSalary,
       periodDays,
@@ -167,19 +178,20 @@ export class EarningsService {
     requests: number;
   }) {
     const { worker, settings, period, at } = input;
-    const out: string[] = [];
-    if (worker.company.status !== 'ACTIVE') out.push('El servicio está suspendido para tu empresa');
+    const out: Blocker[] = [];
+    const add = (code: BlockerCode, message: string) => out.push({ code, message });
+    if (worker.company.status !== 'ACTIVE') add('COMPANY_SUSPENDED', 'El servicio está suspendido para tu empresa');
     if (!worker.enabled || worker.status === 'DISABLED' || worker.status === 'RETIRED')
-      out.push('Tu empresa no tiene habilitado FLEXA para ti');
-    if (worker.kycStatus !== 'APPROVED') out.push('Debes completar la validación de identidad');
+      add('WORKER_DISABLED', 'Tu empresa no tiene habilitado FLEXA para ti');
+    if (worker.kycStatus !== 'APPROVED') add('KYC', 'Debes completar la validación de identidad');
     const accepted = new Set(worker.consents.map((c) => c.document.type));
     if (!accepted.has('TERMS') || !accepted.has('PAYROLL_DEDUCTION_AUTH'))
-      out.push('Debes aceptar los términos y la autorización de descuento por nómina');
-    if (!worker.accounts.length) out.push('Debes registrar una cuenta de destino');
+      add('CONSENTS', 'Debes aceptar los términos y la autorización de descuento por nómina');
+    if (!worker.accounts.length) add('ACCOUNT', 'Debes registrar una cuenta de destino');
     if (daysBetween(at, period.payDate) < settings.blackoutDaysBeforePay)
-      out.push(`No se reciben solicitudes ${settings.blackoutDaysBeforePay} días antes del pago de nómina`);
+      add('BLACKOUT', `No se reciben solicitudes ${settings.blackoutDaysBeforePay} días antes del pago de nómina`);
     if (input.requests >= settings.maxRequestsPerPeriod)
-      out.push(`Alcanzaste el máximo de ${settings.maxRequestsPerPeriod} solicitudes en el periodo`);
+      add('REQUEST_LIMIT', `Alcanzaste el máximo de ${settings.maxRequestsPerPeriod} solicitudes en el periodo`);
     return out;
   }
 
@@ -212,9 +224,10 @@ export class EarningsService {
     if (amount < settings.minAmount) errors.push(`El monto mínimo es $${settings.minAmount.toLocaleString('es-CO')}`);
     if (amount > settings.maxAmountPerRequest)
       errors.push(`El monto máximo por solicitud es $${settings.maxAmountPerRequest.toLocaleString('es-CO')}`);
-    if (amount > s.available) errors.push('El monto supera tu disponible');
-
     const fee = settings.feePerRequest;
+    // The fee is also discounted from the available, so amount + fee must fit in it.
+    if (amount + fee > s.available)
+      errors.push(amount > s.available ? 'El monto supera tu disponible' : 'El monto más la comisión supera tu disponible');
     const usedAfter = s.used + amount + fee;
     const usagePctAfter = s.limit ? Math.round((usedAfter / s.limit) * 100) : 100;
     const warnings: string[] = [];

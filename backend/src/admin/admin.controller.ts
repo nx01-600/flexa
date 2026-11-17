@@ -7,6 +7,8 @@ import { type AuthUser, CurrentUser, Roles } from '../common/auth.js';
 import { sum } from '../common/util.js';
 import { AdvancesService } from '../ewa/advances.service.js';
 import { OnboardingService } from '../ewa/worker.controller.js';
+import { AdvanceStatus, IncidentStatus } from '../generated/prisma/enums.js';
+import { SettingsDto, checkSettingsUpdate, enumParam } from '../company/company.controller.js';
 
 class CompanyDto {
   @IsString() name: string;
@@ -127,11 +129,13 @@ export class AdminController {
 
   // Authorized parameters: FLEXA can adjust a client's rules when they ask for support.
   @Patch('companies/:id/settings')
-  async settings(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: Record<string, number | string>) {
-    const allowed = ['maxAdvancePct', 'recommendedPct', 'minAmount', 'maxAmountPerRequest', 'maxRequestsPerPeriod', 'feePerRequest', 'blackoutDaysBeforePay', 'alarmUsagePct', 'alarmRequestsCount', 'exceptionAmount'];
-    const data = Object.fromEntries(Object.entries(dto).filter(([k]) => allowed.includes(k)).map(([k, v]) => [k, Number(v)]));
+  async settings(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: SettingsDto) {
+    if (!(await this.prisma.company.findUnique({ where: { id }, select: { id: true } }))) throw new NotFoundException('Empresa no encontrada');
+    // Same rules as the company's own endpoint, checked against the stored values (created with defaults if missing).
+    const before = await this.prisma.companySettings.upsert({ where: { companyId: id }, create: { companyId: id }, update: {} });
+    const data = checkSettingsUpdate(before, dto);
     if (!Object.keys(data).length) throw new BadRequestException('Sin parámetros válidos');
-    const s = await this.prisma.companySettings.upsert({ where: { companyId: id }, create: { companyId: id, ...data }, update: data });
+    const s = await this.prisma.companySettings.update({ where: { companyId: id }, data });
     await this.audit.log({ actorId: u.sub, companyId: id, entity: 'CompanySettings', entityId: s.id, action: 'UPDATED_BY_FLEXA', data });
     return s;
   }
@@ -146,7 +150,7 @@ export class AdminController {
   @Get('incidents')
   incidents(@Query('status') status?: string, @Query('companyId') companyId?: string) {
     return this.prisma.incident.findMany({
-      where: { ...(status ? { status: status as never } : {}), ...(companyId ? { companyId } : {}) },
+      where: { ...(status ? { status: enumParam(IncidentStatus, status) } : {}), ...(companyId ? { companyId } : {}) },
       include: { company: { select: { name: true } }, worker: { select: { firstName: true, lastName: true } }, advance: { select: { code: true, status: true, amount: true } } },
       orderBy: { createdAt: 'desc' },
       take: 300,
@@ -167,7 +171,7 @@ export class AdminController {
   @Get('advances')
   advancesList(@Query('status') status?: string, @Query('companyId') companyId?: string) {
     return this.prisma.advance.findMany({
-      where: { ...(status ? { status: status as never } : {}), ...(companyId ? { worker: { companyId } } : {}) },
+      where: { ...(status ? { status: enumParam(AdvanceStatus, status) } : {}), ...(companyId ? { worker: { companyId } } : {}) },
       include: { worker: { select: { firstName: true, lastName: true, company: { select: { name: true } } } }, bankAccount: { select: { bank: true } } },
       orderBy: { createdAt: 'desc' },
       take: 300,
@@ -193,10 +197,17 @@ export class AdminController {
     const pending = await this.prisma.worker.findUnique({ where: { id: workerId } });
     if (!pending) throw new NotFoundException('Trabajador no encontrado');
     if (pending.kycStatus !== 'MANUAL_REVIEW') throw new BadRequestException('El trabajador no está en revisión manual');
-    const w = await this.prisma.worker.update({ where: { id: workerId }, data: { kycStatus: dto.status } });
+    // Status change, its KycCheck and the audit record commit together (or not at all).
+    const w = await this.prisma.$transaction(async (tx) => {
+      // The status condition makes a concurrent second decision fail instead of overwriting the first.
+      const r = await tx.worker.updateMany({ where: { id: workerId, kycStatus: 'MANUAL_REVIEW' }, data: { kycStatus: dto.status } });
+      if (!r.count) throw new BadRequestException('El trabajador no está en revisión manual');
+      await tx.kycCheck.create({ data: { workerId, type: 'MANUAL_REVIEW', status: dto.status, provider: 'FLEXA', detail: dto.note } });
+      await this.audit.log({ actorId: u.sub, companyId: pending.companyId, entity: 'Worker', entityId: workerId, action: `KYC_${dto.status}`, data: { note: dto.note } }, tx);
+      return tx.worker.findUniqueOrThrow({ where: { id: workerId } });
+    });
+    // Reads the committed worker through the plain client, so it runs after the transaction.
     await this.onboarding.refresh(workerId);
-    await this.prisma.kycCheck.create({ data: { workerId, type: 'MANUAL_REVIEW', status: dto.status, provider: 'FLEXA', detail: dto.note } });
-    await this.audit.log({ actorId: u.sub, companyId: w.companyId, entity: 'Worker', entityId: workerId, action: `KYC_${dto.status}`, data: { note: dto.note } });
     return w;
   }
 

@@ -2,8 +2,10 @@ import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoun
 import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../common/audit.service.js';
-import { type AuthUser, CurrentUser } from '../common/auth.js';
+import { type AuthUser, CurrentUser, requireCompany } from '../common/auth.js';
 import { code } from '../common/util.js';
+import { TicketStatus } from '../generated/prisma/enums.js';
+import { enumParam } from '../company/company.controller.js';
 
 class TicketDto {
   @IsString() category: string;
@@ -30,7 +32,7 @@ export class SupportController {
   private scope(u: AuthUser) {
     if (u.role === 'FLEXA_ADMIN') return {};
     if (u.role === 'WORKER') return { userId: u.sub };
-    return { user: { companyId: u.companyId } };
+    return { user: { companyId: requireCompany(u) } };
   }
 
   @Get('categories')
@@ -41,7 +43,7 @@ export class SupportController {
   @Get('tickets')
   list(@CurrentUser() u: AuthUser, @Query('status') status?: string) {
     return this.prisma.supportTicket.findMany({
-      where: { ...this.scope(u), ...(status ? { status: status as never } : {}) },
+      where: { ...this.scope(u), ...(status ? { status: enumParam(TicketStatus, status) } : {}) },
       include: { user: { select: { name: true, role: true } }, _count: { select: { messages: true } } },
       orderBy: { updatedAt: 'desc' },
     });
@@ -75,6 +77,8 @@ export class SupportController {
   @Post('tickets/:id/messages')
   async reply(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: ReplyDto) {
     const t = await this.one(u, id);
+    // Among company roles only the admin answers others' tickets; Finance only replies on the ones it opened.
+    if (u.role === 'COMPANY_FINANCE' && t.userId !== u.sub) throw new ForbiddenException('Solo el administrador de la empresa puede responder');
     if (t.status === 'CLOSED') throw new BadRequestException('La solicitud está cerrada');
     const msg = await this.prisma.ticketMessage.create({ data: { ticketId: t.id, authorId: u.sub, body: dto.body } });
     const fromSupport = u.role === 'FLEXA_ADMIN';
@@ -85,7 +89,11 @@ export class SupportController {
   @Patch('tickets/:id/status')
   async status(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: StatusDto) {
     const t = await this.one(u, id);
-    if (u.role !== 'FLEXA_ADMIN' && dto.status !== 'CLOSED') throw new ForbiddenException('Solo puedes cerrar tu solicitud');
+    if (u.role !== 'FLEXA_ADMIN') {
+      if (dto.status !== 'CLOSED') throw new ForbiddenException('Solo puedes cerrar tu solicitud');
+      // Company staff reads worker tickets but only the worker (or FLEXA) closes them.
+      if (u.role !== 'WORKER' && t.user.role === 'WORKER') throw new ForbiddenException('Solo el trabajador o FLEXA pueden cerrar esta solicitud');
+    }
     await this.prisma.supportTicket.update({ where: { id: t.id }, data: { status: dto.status } });
     await this.audit.log({ actorId: u.sub, companyId: t.user.companyId, entity: 'SupportTicket', entityId: t.id, action: `STATUS_${dto.status}` });
     return { ok: true };

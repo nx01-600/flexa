@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -8,13 +9,15 @@ import {
   NotFoundException,
   Post,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../common/audit.service.js';
-import { type AuthUser, CurrentUser, Public } from '../common/auth.js';
+import { type AuthUser, CurrentUser, normalizeDoc, Public } from '../common/auth.js';
 import type { User } from '../generated/prisma/client.js';
 
 class LoginDto {
@@ -38,6 +41,8 @@ const SURFACE_ROLES = {
   admin: ['FLEXA_ADMIN'],
 } as const;
 
+export const throttleLimit = (raw = process.env.THROTTLE_LIMIT) => Number.parseInt(raw ?? '', 10) || 20;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -59,11 +64,24 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const id = dto.email.trim().toLowerCase();
-    const byDoc = id.includes('@')
-      ? null
-      : await this.prisma.worker.findFirst({ where: { docNumber: id.replace(/\D/g, ''), userId: { not: null } } });
+    let userId: string | null = null;
+    if (!id.includes('@')) {
+      const digits = normalizeDoc(id);
+      // Stored documents may contain dots, so both sides are reduced to digits.
+      // shortcut: full scan of Worker per cédula login, add an expression index when the table grows.
+      const rows = digits
+        ? await this.prisma.$queryRaw<{ userId: string }[]>`
+            SELECT "userId" FROM "Worker"
+            WHERE "userId" IS NOT NULL AND regexp_replace("docNumber", '[^0-9]', '', 'g') = ${digits}`
+        : [];
+      // The cédula is unique per company only: never pick an arbitrary account.
+      if (rows.length > 1) {
+        throw new BadRequestException('Esta cédula está registrada en más de una empresa. Inicia sesión con tu correo electrónico.');
+      }
+      userId = rows[0]?.userId ?? null;
+    }
     const user = await this.prisma.user.findUnique({
-      where: byDoc ? { id: byDoc.userId! } : { email: id },
+      where: userId ? { id: userId } : { email: id },
       include: { worker: { select: { id: true } } },
     });
     if (!user || !user.active || !(await bcrypt.compare(dto.password, user.passwordHash))) {
@@ -79,14 +97,17 @@ export class AuthService {
 
   // Módulo 1: only workers previously loaded and enabled by their company can register.
   async register(dto: RegisterDto) {
-    const email = dto.email.toLowerCase();
-    const worker = await this.prisma.worker.findFirst({
-      where: { docNumber: dto.docNumber, email: { equals: email, mode: 'insensitive' } },
-    });
+    const email = dto.email.trim().toLowerCase();
+    const doc = normalizeDoc(dto.docNumber);
+    // Stored documents may contain dots, so both sides are compared as digits.
+    const candidates = await this.prisma.worker.findMany({ where: { email: { equals: email, mode: 'insensitive' } } });
+    const worker = doc ? candidates.find((w) => normalizeDoc(w.docNumber) === doc) : undefined;
     if (!worker) throw new NotFoundException('No encontramos un trabajador habilitado con ese documento y correo');
     if (!worker.enabled) throw new UnauthorizedException('Tu empresa no ha habilitado FLEXA para ti');
     if (worker.userId) throw new ConflictException('Este trabajador ya está registrado');
-    if (await this.prisma.user.findUnique({ where: { email } })) throw new ConflictException('El correo ya está en uso');
+    if (await this.prisma.user.findUnique({ where: { email }, select: { id: true } })) {
+      throw new ConflictException('El correo ya está en uso');
+    }
 
     const user = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -116,12 +137,13 @@ export class AuthService {
 export class AuthController {
   constructor(private auth: AuthService) {}
 
-  @Public() @Post('login')
+  // Brute-force sensitive routes carry the strict limit (THROTTLE_LIMIT per minute per IP); nothing else is throttled.
+  @Public() @UseGuards(ThrottlerGuard) @Post('login')
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
   }
 
-  @Public() @Post('register')
+  @Public() @UseGuards(ThrottlerGuard) @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
   }
@@ -133,6 +155,7 @@ export class AuthController {
 }
 
 @Module({
+  imports: [ThrottlerModule.forRootAsync({ useFactory: () => [{ ttl: 60_000, limit: throttleLimit() }] })],
   controllers: [AuthController],
   providers: [AuthService],
 })

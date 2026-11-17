@@ -5,6 +5,7 @@ import {
   Get,
   Headers,
   Injectable,
+  Logger,
   NotFoundException,
   Param,
   Patch,
@@ -15,13 +16,13 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { IsArray, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsInt, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../common/audit.service.js';
 import { type AuthUser, CurrentUser, Public, Roles, requireCompany } from '../common/auth.js';
-import { parseCsv } from '../common/util.js';
+import { INT_MAX, csvUpload, exceedsVariance, parseAmount, parseCsv } from '../common/util.js';
 import type { IntegrationType } from '../generated/prisma/enums.js';
 
 class PeriodDto {
@@ -29,7 +30,13 @@ class PeriodDto {
   @IsString() startDate: string;
   @IsString() endDate: string;
   @IsString() payDate: string;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(0) budget?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) budget?: number;
+}
+class BudgetDto {
+  @Type(() => Number) @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER) budget: number;
+}
+class RotateKeyDto {
+  @IsOptional() @IsString() @MaxLength(100) erpName?: string;
 }
 class EntryDto {
   @IsOptional() @Type(() => Number) @IsInt() baseSalary?: number;
@@ -50,19 +57,20 @@ class NoveltyDto {
 }
 class ErpSyncDto {
   @IsOptional() @IsString() periodId?: string;
-  @IsArray() entries: Record<string, unknown>[];
+  @IsArray() @IsObject({ each: true }) entries: Record<string, unknown>[];
 }
 
-// Normalized payroll row coming from a file or from the ERP.
-type Row = Record<string, string>;
-const num = (v: unknown) => {
-  if (v === undefined || v === null || v === '') return undefined;
-  const n = Number(String(v).replace(/[$\s.]/g, '').replace(',', '.'));
-  return Number.isFinite(n) ? n : NaN;
-};
+// Normalized payroll row: CSV cells are strings, ERP JSON values keep their type.
+type Row = Record<string, unknown>;
+type Issue = { row: number; docNumber?: string; field: string; message: string; severity?: string };
+// undefined = not reported, NaN = reported but unreadable.
+const num = (v: unknown, decimals = 0) =>
+  v === undefined || v === null || (typeof v === 'string' && !v.trim()) ? undefined : (parseAmount(v, decimals) ?? NaN);
 
 @Injectable()
 export class PayrollService {
+  private readonly logger = new Logger(PayrollService.name);
+
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
@@ -77,72 +85,99 @@ export class PayrollService {
     const upload = await this.prisma.payrollUpload.create({
       data: { companyId, periodId, source, fileName, totalRows: rows.length, uploadedBy: actorId },
     });
-    const workers = await this.prisma.worker.findMany({ where: { companyId } });
-    const byDoc = new Map(workers.map((w) => [w.docNumber.replace(/\D/g, ''), w]));
-    const issues: { row: number; docNumber?: string; field: string; message: string; severity?: string }[] = [];
-    const seen = new Set<string>();
+    const issues: Issue[] = [];
     let ok = 0;
-    const periodDays = Math.round((+period.endDate - +period.startDate) / 86_400_000) + 1;
+    // From here the upload must always end in a final status, never stay PROCESSING.
+    try {
+      const workers = await this.prisma.worker.findMany({ where: { companyId } });
+      const byDoc = new Map(workers.map((w) => [w.docNumber.replace(/\D/g, ''), w]));
+      const seen = new Set<string>();
+      const periodDays = Math.round((+period.endDate - +period.startDate) / 86_400_000) + 1;
 
-    for (const [i, r] of rows.entries()) {
-      const rowNo = i + 2;
-      const doc = String(r.documento ?? r.doc ?? r.docnumber ?? r.cedula ?? '').replace(/\D/g, '');
-      const salary = num(r.salario ?? r.basesalary ?? r.salario_base);
-      const days = num(r.dias_trabajados ?? r.workeddays ?? r.dias);
-      const otHours = num(r.horas_extra ?? r.overtimehours);
-      const otAmount = num(r.valor_horas_extra ?? r.overtimeamount);
-      const surcharges = num(r.recargos ?? r.surcharges);
-      const deductions = num(r.deducciones ?? r.deductions);
-      const rowIssues: typeof issues = [];
+      for (const [i, r] of rows.entries()) {
+        const rowNo = i + 2;
+        const doc = String(r.documento ?? r.doc ?? r.docnumber ?? r.cedula ?? '').replace(/\D/g, '');
+        // One bad row becomes an issue; it never aborts the rest of the upload.
+        try {
+          const salary = num(r.salario ?? r.basesalary ?? r.salario_base);
+          const days = num(r.dias_trabajados ?? r.workeddays ?? r.dias, 2);
+          const otHours = num(r.horas_extra ?? r.overtimehours, 2);
+          const otAmount = num(r.valor_horas_extra ?? r.overtimeamount);
+          const surcharges = num(r.recargos ?? r.surcharges);
+          const deductions = num(r.deducciones ?? r.deductions);
+          const rowIssues: Issue[] = [];
 
-      if (!doc) rowIssues.push({ row: rowNo, field: 'documento', message: 'Documento faltante' });
-      const worker = doc ? byDoc.get(doc) : undefined;
-      if (doc && !worker) rowIssues.push({ row: rowNo, docNumber: doc, field: 'documento', message: 'El trabajador no está registrado en FLEXA' });
-      if (doc && seen.has(doc)) rowIssues.push({ row: rowNo, docNumber: doc, field: 'documento', message: 'Documento duplicado en el archivo' });
-      if (salary === undefined) rowIssues.push({ row: rowNo, docNumber: doc, field: 'salario', message: 'Salario faltante' });
-      for (const [field, v] of Object.entries({ salario: salary, dias_trabajados: days, horas_extra: otHours, valor_horas_extra: otAmount, recargos: surcharges, deducciones: deductions })) {
-        if (Number.isNaN(v) || (v ?? 0) < 0) rowIssues.push({ row: rowNo, docNumber: doc, field, message: 'Valor inválido' });
+          if (!doc) rowIssues.push({ row: rowNo, field: 'documento', message: 'Documento faltante' });
+          const worker = doc ? byDoc.get(doc) : undefined;
+          if (doc && !worker) rowIssues.push({ row: rowNo, docNumber: doc, field: 'documento', message: 'El trabajador no está registrado en FLEXA' });
+          if (doc && seen.has(doc)) rowIssues.push({ row: rowNo, docNumber: doc, field: 'documento', message: 'Documento duplicado en el archivo' });
+          // Marked even when the row fails, so a rejected row is not also reported as missing from the file.
+          if (doc) seen.add(doc);
+          if (salary === undefined) rowIssues.push({ row: rowNo, docNumber: doc, field: 'salario', message: 'Salario faltante' });
+          else if (salary === 0) rowIssues.push({ row: rowNo, docNumber: doc, field: 'salario', message: 'El salario debe ser mayor a 0' });
+          for (const [field, v] of Object.entries({ salario: salary, dias_trabajados: days, horas_extra: otHours, valor_horas_extra: otAmount, recargos: surcharges, deducciones: deductions })) {
+            if (Number.isNaN(v) || (v ?? 0) < 0 || (v ?? 0) > INT_MAX) rowIssues.push({ row: rowNo, docNumber: doc, field, message: 'Valor inválido' });
+          }
+          if (days !== undefined && Number.isFinite(days)) {
+            if (!Number.isInteger(days)) rowIssues.push({ row: rowNo, docNumber: doc, field: 'dias_trabajados', message: 'Los días trabajados deben ser un número entero' });
+            else if (days > periodDays) rowIssues.push({ row: rowNo, docNumber: doc, field: 'dias_trabajados', message: `Supera los ${periodDays} días del periodo` });
+          }
+          if (rowIssues.length || !worker) {
+            issues.push(...rowIssues);
+            continue;
+          }
+          // A salary far from the registered one is rejected, not applied: the admin confirms it via PATCH periods/:id/entries/:workerId.
+          if (exceedsVariance(salary!, worker.baseSalary)) {
+            issues.push({ row: rowNo, docNumber: doc, field: 'salario', message: `Variación mayor al 30 % frente al salario registrado (${worker.baseSalary}); no se aplicó, corrígelo manualmente si es correcto` });
+            continue;
+          }
+          // Warnings don't block the row but are flagged for review.
+          if (otHours && !otAmount)
+            issues.push({ row: rowNo, docNumber: doc, field: 'valor_horas_extra', message: 'Reporta horas extra sin valor', severity: 'WARNING' });
+
+          const data = {
+            baseSalary: salary!,
+            workedDays: days ?? 0,
+            overtimeHours: otHours ?? 0,
+            overtimeAmount: otAmount ?? 0,
+            surcharges: surcharges ?? 0,
+            deductions: deductions ?? 0,
+            uploadId: upload.id,
+          };
+          // Entry and registered salary change together or not at all.
+          await this.prisma.$transaction([
+            this.prisma.payrollEntry.upsert({
+              where: { periodId_workerId: { periodId, workerId: worker.id } },
+              create: { ...data, periodId, workerId: worker.id },
+              update: data,
+            }),
+            ...(salary !== worker.baseSalary ? [this.prisma.worker.update({ where: { id: worker.id }, data: { baseSalary: salary! } })] : []),
+          ]);
+          ok++;
+        } catch (e) {
+          this.logger.error(`Upload ${upload.id} row ${rowNo}: ${e instanceof Error ? e.message : String(e)}`);
+          issues.push({ row: rowNo, docNumber: doc || undefined, field: 'fila', message: 'Error inesperado al procesar la fila' });
+        }
       }
-      if (days !== undefined && days > periodDays)
-        rowIssues.push({ row: rowNo, docNumber: doc, field: 'dias_trabajados', message: `Supera los ${periodDays} días del periodo` });
-      if (rowIssues.length || !worker) {
-        issues.push(...rowIssues);
-        continue;
-      }
-      seen.add(doc);
-      // Warnings don't block the row but are flagged for review.
-      if (salary && Math.abs(salary - worker.baseSalary) / worker.baseSalary > 0.3)
-        issues.push({ row: rowNo, docNumber: doc, field: 'salario', message: `Variación mayor al 30 % frente al salario registrado (${worker.baseSalary})`, severity: 'WARNING' });
-      if (otHours && !otAmount)
-        issues.push({ row: rowNo, docNumber: doc, field: 'valor_horas_extra', message: 'Reporta horas extra sin valor', severity: 'WARNING' });
 
-      const data = {
-        baseSalary: salary!,
-        workedDays: days ?? 0,
-        overtimeHours: otHours ?? 0,
-        overtimeAmount: otAmount ?? 0,
-        surcharges: surcharges ?? 0,
-        deductions: deductions ?? 0,
-        uploadId: upload.id,
-      };
-      await this.prisma.payrollEntry.upsert({
-        where: { periodId_workerId: { periodId, workerId: worker.id } },
-        create: { ...data, periodId, workerId: worker.id },
-        update: data,
-      });
-      if (salary !== worker.baseSalary) await this.prisma.worker.update({ where: { id: worker.id }, data: { baseSalary: salary } });
-      ok++;
+      // Enabled workers missing from the file.
+      const missing = workers.filter((w) => w.enabled && w.status !== 'RETIRED' && !seen.has(w.docNumber.replace(/\D/g, '')));
+      if (source === 'FILE' || rows.length > 1)
+        for (const w of missing) issues.push({ row: 0, docNumber: w.docNumber, field: 'documento', message: `Trabajador habilitado sin información en la nómina (${w.firstName} ${w.lastName})`, severity: 'WARNING' });
+
+      if (issues.length) await this.prisma.payrollIssue.createMany({ data: issues.map((x) => ({ ...x, uploadId: upload.id, severity: x.severity ?? 'ERROR' })) });
+      const status = ok === 0 && rows.length ? 'FAILED' : issues.length ? 'WITH_ISSUES' : 'PROCESSED';
+      await this.prisma.payrollUpload.update({ where: { id: upload.id }, data: { okRows: ok, status } });
+    } catch (e) {
+      this.logger.error(`Upload ${upload.id} aborted: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`);
+      await this.prisma.payrollUpload.update({ where: { id: upload.id }, data: { okRows: ok, status: 'FAILED' } }).catch(() => undefined);
+      await this.prisma.payrollIssue
+        .create({ data: { uploadId: upload.id, row: 0, field: 'archivo', message: 'La carga se interrumpió por un error interno', severity: 'ERROR' } })
+        .catch(() => undefined);
+      throw e;
     }
 
-    // Enabled workers missing from the file.
-    const missing = workers.filter((w) => w.enabled && w.status !== 'RETIRED' && !seen.has(w.docNumber.replace(/\D/g, '')));
-    if (source === 'FILE' || rows.length > 1)
-      for (const w of missing) issues.push({ row: 0, docNumber: w.docNumber, field: 'documento', message: `Trabajador habilitado sin información en la nómina (${w.firstName} ${w.lastName})`, severity: 'WARNING' });
-
-    if (issues.length) await this.prisma.payrollIssue.createMany({ data: issues.map((x) => ({ ...x, uploadId: upload.id, severity: x.severity ?? 'ERROR' })) });
     const hasErrors = issues.some((x) => (x.severity ?? 'ERROR') === 'ERROR');
-    const status = ok === 0 && rows.length ? 'FAILED' : issues.length ? 'WITH_ISSUES' : 'PROCESSED';
-    await this.prisma.payrollUpload.update({ where: { id: upload.id }, data: { okRows: ok, status } });
     await this.prisma.company.update({ where: { id: companyId }, data: { lastSyncAt: new Date(), integrationStatus: hasErrors ? 'DEGRADED' : 'OK' } });
     if (hasErrors)
       await this.prisma.incident.create({
@@ -189,12 +224,11 @@ export class PayrollController {
     return { ...period, budget: dto.budget ?? null };
   }
 
-  @Roles(...COMPANY) @Patch('periods/:id/budget')
-  async budget(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: { budget: number }) {
+  // Finance is read-only: only the company admin sets the budget.
+  @Roles(...ADMIN) @Patch('periods/:id/budget')
+  async budget(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: BudgetDto) {
     const companyId = requireCompany(u);
-    const budget = Number(dto?.budget);
-    if (!Number.isFinite(budget) || budget < 0) throw new BadRequestException('Presupuesto inválido');
-    const r = await this.prisma.payrollPeriod.updateMany({ where: { id, companyId }, data: { budget: BigInt(Math.round(budget)) } });
+    const r = await this.prisma.payrollPeriod.updateMany({ where: { id, companyId }, data: { budget: BigInt(dto.budget) } });
     if (!r.count) throw new NotFoundException('Periodo no encontrado');
     await this.audit.log({ actorId: u.sub, companyId, entity: 'PayrollPeriod', entityId: id, action: 'BUDGET_SET', data: { budget: dto.budget } });
     return { ok: true };
@@ -237,7 +271,7 @@ export class PayrollController {
 
   // File upload: CSV with documento,salario,dias_trabajados,horas_extra,valor_horas_extra,recargos,deducciones
   @Roles(...ADMIN) @Post('periods/:id/upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', csvUpload))
   upload(@CurrentUser() u: AuthUser, @Param('id') id: string, @UploadedFile() file?: { buffer: Buffer; originalname: string }) {
     if (!file) throw new BadRequestException('Adjunta un archivo CSV en el campo "file"');
     return this.payroll.ingest(requireCompany(u), id, parseCsv(file.buffer.toString('utf8')), 'FILE', file.originalname, u.sub);
@@ -253,12 +287,12 @@ export class PayrollController {
       (dto.periodId && (await this.prisma.payrollPeriod.findFirst({ where: { id: dto.periodId, companyId: company.id } }))) ||
       (await this.prisma.payrollPeriod.findFirst({ where: { companyId: company.id, status: 'OPEN' }, orderBy: { startDate: 'desc' } }));
     if (!period) throw new BadRequestException('No hay periodo abierto');
-    const rows = dto.entries.map((e) => Object.fromEntries(Object.entries(e).map(([k, v]) => [k.toLowerCase(), String(v ?? '')])));
+    const rows = dto.entries.map((e) => Object.fromEntries(Object.entries(e).map(([k, v]) => [k.toLowerCase(), v])));
     return this.payroll.ingest(company.id, period.id, rows, 'ERP_API', `${company.erpName ?? 'ERP'} ${new Date().toISOString()}`);
   }
 
   @Roles(...ADMIN) @Post('integration/api-key')
-  async rotateKey(@CurrentUser() u: AuthUser, @Body() dto: { erpName?: string }) {
+  async rotateKey(@CurrentUser() u: AuthUser, @Body() dto: RotateKeyDto) {
     const companyId = requireCompany(u);
     const apiKey = `flx_${randomBytes(24).toString('hex')}`;
     await this.prisma.company.update({ where: { id: companyId }, data: { apiKey, integrationType: 'ERP_API', erpName: dto.erpName } });

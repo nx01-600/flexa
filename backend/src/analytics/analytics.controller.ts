@@ -156,7 +156,7 @@ export class AnalyticsController {
   @Get('trends')
   async trends(@CurrentUser() u: AuthUser, @Query('limit') limit = '6') {
     const companyId = requireCompany(u);
-    const periods = (await this.prisma.payrollPeriod.findMany({ where: { companyId }, orderBy: { startDate: 'desc' }, take: Math.min(Number(limit) || 6, 24) })).reverse();
+    const periods = (await this.prisma.payrollPeriod.findMany({ where: { companyId }, orderBy: { startDate: 'desc' }, take: Math.min(Math.max(Number(limit) || 6, 1), 24) })).reverse();
     const out = [];
     for (const period of periods) {
       const [p, adv] = await Promise.all([
@@ -204,7 +204,7 @@ export class AnalyticsController {
   async usage(@CurrentUser() u: AuthUser, @Query('months') months = '6') {
     const companyId = requireCompany(u);
     const from = new Date();
-    from.setMonth(from.getMonth() - (Number(months) || 6) + 1, 1);
+    from.setMonth(from.getMonth() - Math.min(Math.max(Number(months) || 6, 1), 36) + 1, 1);
     from.setHours(0, 0, 0, 0);
     const [advances, payments, period] = await Promise.all([
       this.prisma.advance.findMany({

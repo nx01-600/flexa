@@ -19,7 +19,21 @@ const FIRST = ['Andrés', 'Sofía', 'Mateo', 'Isabella', 'Santiago', 'Mariana', 
 const LAST = ['García', 'Rodríguez', 'Martínez', 'Hernández', 'López', 'González', 'Pérez', 'Sánchez', 'Ramírez', 'Torres', 'Flórez', 'Rivera', 'Gómez', 'Díaz', 'Moreno', 'Muñoz', 'Rojas', 'Vargas', 'Castro', 'Ortiz', 'Ospina', 'Cardona', 'Mejía', 'Restrepo', 'Valencia'];
 const POSITIONS = ['Auxiliar de bodega', 'Operario de producción', 'Asesor comercial', 'Auxiliar administrativo', 'Conductor', 'Cajero', 'Analista', 'Supervisor de turno', 'Técnico de mantenimiento'];
 
+// The seed TRUNCATEs every table: only run it against a local database (or with an explicit override).
+function assertSafeTarget() {
+  if (process.env.NODE_ENV === 'production') throw new Error('Refusing to seed: NODE_ENV=production');
+  if (process.env.ALLOW_SEED === '1') return;
+  let host = '';
+  try {
+    host = new URL(process.env.DATABASE_URL ?? '').hostname;
+  } catch {}
+  if (!['localhost', '127.0.0.1', 'postgres'].includes(host)) {
+    throw new Error(`Refusing to seed: DATABASE_URL host "${host}" is not local. Set ALLOW_SEED=1 to override.`);
+  }
+}
+
 async function main() {
+  assertSafeTarget();
   console.log('Limpiando datos…');
   await prisma.$executeRawUnsafe(`
     TRUNCATE "AuditLog","TicketMessage","SupportTicket","Document","Incident","Reconciliation","CompensationLine",

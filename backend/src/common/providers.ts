@@ -9,10 +9,12 @@ export class KycProvider {
   private log = new Logger('KycProvider');
 
   // Documents ending in "000" go to manual review; a biometric score under 0.6 is rejected.
-  verify(input: { docNumber: string; selfieScore?: number }) {
+  // The sandbox decides the score itself: documents ending in "999" simulate a failed selfie match.
+  verify(input: { docNumber: string }) {
     const ref = `KYC-${randomUUID().slice(0, 8)}`;
-    const score = input.selfieScore ?? 0.93;
-    const status = input.docNumber.replace(/\D/g, '').endsWith('000')
+    const digits = input.docNumber.replace(/\D/g, '');
+    const score = digits.endsWith('999') ? 0.42 : 0.93;
+    const status = digits.endsWith('000')
       ? ('MANUAL_REVIEW' as const)
       : score < 0.6
         ? ('REJECTED' as const)
@@ -24,9 +26,17 @@ export class KycProvider {
 
 @Injectable()
 export class FundingProvider {
+  private log = new Logger('FundingProvider');
+
   // Aliado de fondeo: reserves the liquidity that finances a disbursement.
   reserve(amount: number) {
     return { ok: amount > 0, ref: `FND-${randomUUID().slice(0, 8)}` };
+  }
+
+  // Frees a reservation whose disbursement did not go out.
+  release(ref: string) {
+    this.log.log(`release ${ref}`);
+    return { ok: true };
   }
 }
 

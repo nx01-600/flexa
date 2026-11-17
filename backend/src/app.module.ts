@@ -3,7 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from './prisma/prisma.module.js';
-import { AuthGuard } from './common/auth.js';
+import { assertJwtSecret, AuthGuard } from './common/auth.js';
 import { AuthModule } from './auth/auth.module.js';
 import { EarningsService } from './ewa/earnings.service.js';
 import { AdvancesService } from './ewa/advances.service.js';
@@ -19,10 +19,13 @@ import { HealthController } from './health.controller.js';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    JwtModule.register({
+    // The factory throws at startup when JWT_SECRET is missing or weak (no insecure fallback).
+    JwtModule.registerAsync({
       global: true,
-      secret: process.env.JWT_SECRET ?? 'dev-secret',
-      signOptions: { expiresIn: '12h' },
+      useFactory: () => ({
+        secret: assertJwtSecret(process.env.JWT_SECRET),
+        signOptions: { expiresIn: '12h' },
+      }),
     }),
     PrismaModule,
     AuthModule,

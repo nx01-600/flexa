@@ -18,10 +18,8 @@ import {
   IsEmail,
   IsIn,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
-  Max,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -30,15 +28,12 @@ import { AuditService } from '../common/audit.service.js';
 import { KycProvider } from '../common/providers.js';
 import { type AuthUser, CurrentUser, Roles, requireWorker } from '../common/auth.js';
 import { code, DAY, toCsv } from '../common/util.js';
-import { EarningsService } from './earnings.service.js';
+import { EarningsService, paymentBlockers } from './earnings.service.js';
 import { AdvancesService } from './advances.service.js';
 
 class UpdateProfileDto {
   @IsOptional() @IsString() phone?: string;
   @IsOptional() @IsEmail() email?: string;
-}
-class KycDto {
-  @IsOptional() @IsNumber() @Min(0) @Max(1) selfieScore?: number;
 }
 class AccountDto {
   @IsString() bank: string;
@@ -127,12 +122,13 @@ export class WorkerController {
   }
 
   // Identity validation: document, selfie biometrics and antifraud through the KYC provider.
+  // The biometric score comes from the provider, never from the client.
   @Post('kyc')
-  async runKyc(@CurrentUser() u: AuthUser, @Body() dto: KycDto) {
+  async runKyc(@CurrentUser() u: AuthUser) {
     const id = requireWorker(u);
     const worker = await this.prisma.worker.findUniqueOrThrow({ where: { id } });
     if (worker.kycStatus === 'APPROVED') return { status: 'APPROVED', checks: [] };
-    const result = this.kyc.verify({ docNumber: worker.docNumber, selfieScore: dto.selfieScore });
+    const result = this.kyc.verify({ docNumber: worker.docNumber });
     const checks = await this.prisma.$transaction([
       ...['DOCUMENT', 'SELFIE_BIOMETRIC', 'ANTIFRAUD'].map((type) =>
         this.prisma.kycCheck.create({
@@ -256,7 +252,7 @@ export class WorkerController {
         feePerRequest: s.settings.feePerRequest,
         blackoutDaysBeforePay: s.settings.blackoutDaysBeforePay,
       },
-      canRequest: s.blockers.length === 0 && s.available >= s.settings.minAmount,
+      canRequest: s.blockers.length === 0 && s.available >= s.settings.minAmount + s.settings.feePerRequest,
       blockers: s.blockers,
       dataUpdatedAt: s.dataUpdatedAt,
     };
@@ -408,7 +404,7 @@ export class WorkerController {
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
       const s = await this.earnings.snapshot(id, tx);
-      const blockers = s.blockers.filter((b) => !b.includes('solicitudes'));
+      const blockers = paymentBlockers(s);
       if (blockers.length) throw new BadRequestException(blockers[0]);
       if (dto.amount > s.available) throw new BadRequestException('El monto supera tu disponible');
       const payment = await tx.servicePayment.create({

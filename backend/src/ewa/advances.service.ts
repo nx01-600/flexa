@@ -1,14 +1,20 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService, type Tx } from '../common/audit.service.js';
 import { FundingProvider, PaymentsProvider } from '../common/providers.js';
 import { code } from '../common/util.js';
-import { EarningsService, type Snapshot } from './earnings.service.js';
+import { type BlockerCode, EarningsService, type Snapshot } from './earnings.service.js';
 import type { AdvanceStatus } from '../generated/prisma/enums.js';
+
+// Blockers that stop a FAILED advance from being paid on retry. Blackout, consents and the request cap
+// applied when it was first requested, so they do not apply again.
+const RETRY_BLOCKERS: BlockerCode[] = ['COMPANY_SUSPENDED', 'WORKER_DISABLED', 'KYC', 'ACCOUNT', 'NO_PERIOD'];
 
 // Módulos 3, 4 y 7: request lifecycle, automatic flow, exceptions and Alarma FLEXA.
 @Injectable()
 export class AdvancesService {
+  private log = new Logger('AdvancesService');
+
   constructor(
     private prisma: PrismaService,
     private earnings: EarningsService,
@@ -19,6 +25,21 @@ export class AdvancesService {
 
   private event(tx: Tx, advanceId: string, status: AdvanceStatus, note?: string, actor = 'SYSTEM') {
     return tx.advanceEvent.create({ data: { advanceId, status, note, actor } });
+  }
+
+  // Status-guarded write: only the caller that still sees `from` wins, so concurrent
+  // approvals, retries or cancels can't both move the same advance.
+  private async transition(
+    tx: Tx,
+    id: string,
+    from: AdvanceStatus | AdvanceStatus[],
+    data: { status: AdvanceStatus; disbursedAt?: Date; providerRef?: string; fundingRef?: string },
+  ) {
+    const { count } = await tx.advance.updateMany({
+      where: { id, status: Array.isArray(from) ? { in: from } : from },
+      data,
+    });
+    if (count !== 1) throw new ConflictException('La solicitud cambió de estado. Actualiza e intenta de nuevo.');
   }
 
   async request(
@@ -32,6 +53,9 @@ export class AdvancesService {
       const snap = await this.earnings.snapshot(workerId, tx);
       const sim = this.earnings.simulate(snap, input.amount);
       if (!sim.valid) throw new BadRequestException({ message: sim.errors[0], errors: sim.errors });
+      // Same shared period lock as retry(): a request cannot land in a period that close() is closing.
+      const [period] = await tx.$queryRaw<{ status: string }[]>`SELECT status FROM "PayrollPeriod" WHERE id = ${snap.period!.id} FOR SHARE`;
+      if (period?.status !== 'OPEN') throw new BadRequestException('El periodo de nómina ya no está abierto');
       if (sim.requiresAcknowledgement && !input.acknowledgeWarnings) {
         throw new ConflictException({
           message: 'Debes confirmar que leíste las advertencias',
@@ -94,8 +118,26 @@ export class AdvancesService {
       return advance;
     });
 
-    if (created.status === 'APPROVED') return this.disburse(created.id);
-    return this.detail(created.id);
+    if (created.status !== 'APPROVED') return this.detail(created.id);
+    return this.disburseOrFail(created.id);
+  }
+
+  // Used right after an advance is committed as APPROVED (request, exception approval, retry).
+  private async disburseOrFail(advanceId: string, actor?: string) {
+    try {
+      return await this.disburse(advanceId, actor);
+    } catch (e) {
+      // The advance exists: report its real state instead of a raw 500, and never leave it APPROVED unattended
+      // (no endpoint moves an APPROVED advance, and close() would wait on it forever).
+      this.log.error(`disburse ${advanceId} failed: ${String(e)}`);
+      await this.prisma
+        .$transaction(async (tx) => {
+          await this.transition(tx, advanceId, 'APPROVED', { status: 'FAILED' });
+          await this.event(tx, advanceId, 'FAILED', 'No se pudo iniciar el desembolso');
+        })
+        .catch(() => undefined);
+      return this.detail(advanceId);
+    }
   }
 
   // Funding partner reserves liquidity, payments provider moves the money.
@@ -107,19 +149,69 @@ export class AdvancesService {
     if (!advance) throw new NotFoundException('Solicitud no encontrada');
     if (advance.status !== 'APPROVED') throw new BadRequestException('La solicitud no está aprobada');
 
-    await this.prisma.advance.update({ where: { id: advanceId }, data: { status: 'DISBURSING' } });
-    await this.event(this.prisma, advanceId, 'DISBURSING', 'Enviando al proveedor de pagos', actor);
-
-    const funding = this.funding.reserve(advance.amount);
-    const transfer = funding.ok
-      ? this.payments.transfer({ bank: advance.bankAccount.bank, account: advance.bankAccount.number, amount: advance.netAmount })
-      : ({ ok: false, error: 'El aliado de fondeo no confirmó la liquidez' } as const);
-
+    // A lost race throws here (409) before any money moves.
     await this.prisma.$transaction(async (tx) => {
+      await this.transition(tx, advanceId, 'APPROVED', { status: 'DISBURSING' });
+      await this.event(tx, advanceId, 'DISBURSING', 'Enviando al proveedor de pagos', actor);
+    });
+
+    let funding: { ok: boolean; ref: string } | null = null;
+    let transfer: { ok: true; ref: string } | { ok: false; error: string };
+    try {
+      funding = this.funding.reserve(advance.amount);
+      transfer = funding.ok
+        ? this.payments.transfer({ bank: advance.bankAccount.bank, account: advance.bankAccount.number, amount: advance.netAmount })
+        : { ok: false, error: 'El aliado de fondeo no confirmó la liquidez' };
+    } catch (e) {
+      // shortcut: sandbox providers are synchronous, so a throw means no money moved; a real async provider needs a status lookup here.
+      this.log.error(`disburse ${advanceId} provider error: ${String(e)}`);
+      transfer = { ok: false, error: 'Error del proveedor de pagos' };
+    }
+    const fundingRef = funding?.ref;
+
+    try {
+      await this.writeOutcome(advance, transfer, fundingRef);
+    } catch (e) {
+      this.log.error(`disburse ${advanceId} final write failed: ${String(e)}`);
+      // Minimal guarded write so the advance never stays in DISBURSING. A transfer that went out is
+      // recorded as DISBURSED, never FAILED: FAILED frees the amount and a retry would pay twice.
+      await this.prisma
+        .$transaction(async (tx) => {
+          if (transfer.ok) {
+            await this.transition(tx, advanceId, 'DISBURSING', { status: 'DISBURSED', disbursedAt: new Date(), providerRef: transfer.ref, fundingRef });
+            await this.event(tx, advanceId, 'DISBURSED', `Transferencia ${transfer.ref}`);
+          } else {
+            await this.transition(tx, advanceId, 'DISBURSING', { status: 'FAILED', fundingRef });
+            await this.event(tx, advanceId, 'FAILED', transfer.error);
+          }
+        })
+        .catch((err) => this.log.error(`disburse ${advanceId} recovery failed: ${String(err)}`));
+    }
+
+    // The money did not go out: free the liquidity the funding partner reserved.
+    if (!transfer.ok && funding?.ok) {
+      try {
+        this.funding.release(funding.ref);
+      } catch (e) {
+        this.log.error(`release ${funding.ref} failed: ${String(e)}`);
+      }
+    }
+    return this.detail(advanceId);
+  }
+
+  private writeOutcome(
+    advance: { id: string; code: string; workerId: string; netAmount: number; bankAccount: { bank: string }; worker: { companyId: string } },
+    transfer: { ok: true; ref: string } | { ok: false; error: string },
+    fundingRef?: string,
+  ) {
+    const advanceId = advance.id;
+    return this.prisma.$transaction(async (tx) => {
       if (transfer.ok) {
-        await tx.advance.update({
-          where: { id: advanceId },
-          data: { status: 'DISBURSED', disbursedAt: new Date(), providerRef: transfer.ref, fundingRef: funding.ref },
+        await this.transition(tx, advanceId, 'DISBURSING', {
+          status: 'DISBURSED',
+          disbursedAt: new Date(),
+          providerRef: transfer.ref,
+          fundingRef,
         });
         await this.event(tx, advanceId, 'DISBURSED', `Transferencia ${transfer.ref}`);
         await tx.alert.create({
@@ -134,7 +226,7 @@ export class AdvancesService {
           data: { workerId: advance.workerId, type: 'RECEIPT', title: `Comprobante ${advance.code}`, refId: advanceId },
         });
       } else {
-        await tx.advance.update({ where: { id: advanceId }, data: { status: 'FAILED', fundingRef: funding.ref } });
+        await this.transition(tx, advanceId, 'DISBURSING', { status: 'FAILED', fundingRef });
         await this.event(tx, advanceId, 'FAILED', transfer.error);
         await tx.incident.create({
           data: {
@@ -166,7 +258,6 @@ export class AdvancesService {
         tx,
       );
     });
-    return this.detail(advanceId);
   }
 
   // Módulo 7: the company resolves an exception (approve -> automatic disbursement, or reject).
@@ -176,7 +267,7 @@ export class AdvancesService {
     if (advance.status !== 'EXCEPTION') throw new BadRequestException('La solicitud no está en excepción');
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.advance.update({ where: { id: advanceId }, data: { status: approve ? 'APPROVED' : 'REJECTED' } });
+      await this.transition(tx, advanceId, 'EXCEPTION', { status: approve ? 'APPROVED' : 'REJECTED' });
       await this.event(tx, advanceId, approve ? 'APPROVED' : 'REJECTED', note, userId);
       await tx.incident.updateMany({
         where: { advanceId, status: { not: 'RESOLVED' } },
@@ -198,7 +289,7 @@ export class AdvancesService {
         tx,
       );
     });
-    return approve ? this.disburse(advanceId, userId) : this.detail(advanceId);
+    return approve ? this.disburseOrFail(advanceId, userId) : this.detail(advanceId);
   }
 
   // A failed disbursement can be retried (e.g. after the worker fixed the account).
@@ -207,9 +298,24 @@ export class AdvancesService {
       where: { id: advanceId, ...(companyId ? { worker: { companyId } } : {}) },
     });
     if (!advance || advance.status !== 'FAILED') throw new BadRequestException('Solo se reintentan desembolsos fallidos');
-    await this.prisma.advance.update({ where: { id: advanceId }, data: { status: 'APPROVED' } });
-    await this.event(this.prisma, advanceId, 'APPROVED', 'Reintento de desembolso', userId);
-    return this.disburse(advanceId, userId);
+    await this.prisma.$transaction(async (tx) => {
+      // Same per-worker lock as request(): a FAILED advance no longer counts in the available,
+      // so it must fit in it again before it is revived.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${advance.workerId}))`;
+      // FOR SHARE: waits for a concurrent close() (FOR UPDATE) and then sees its CLOSED status.
+      const [period] = await tx.$queryRaw<{ status: string }[]>`SELECT status FROM "PayrollPeriod" WHERE id = ${advance.periodId} FOR SHARE`;
+      const snap = await this.earnings.snapshot(advance.workerId, tx);
+      if (period?.status !== 'OPEN' || snap.period?.id !== advance.periodId)
+        throw new BadRequestException('El periodo de nómina de esta solicitud ya no está abierto');
+      // snapshot() keeps `available` even with blockers, so a disabled/retired worker or a suspended company is checked here.
+      const blocker = snap.blockerDetails.find((b) => RETRY_BLOCKERS.includes(b.code));
+      if (blocker) throw new BadRequestException(`No se puede reintentar: ${blocker.message}`);
+      if (advance.amount + advance.fee > snap.available)
+        throw new BadRequestException('El monto más la comisión supera el disponible actual del trabajador');
+      await this.transition(tx, advanceId, 'FAILED', { status: 'APPROVED' });
+      await this.event(tx, advanceId, 'APPROVED', 'Reintento de desembolso', userId);
+    });
+    return this.disburseOrFail(advanceId, userId);
   }
 
   async cancel(workerId: string, advanceId: string, userId: string) {
@@ -217,14 +323,14 @@ export class AdvancesService {
     if (!advance) throw new NotFoundException('Solicitud no encontrada');
     if (!['REQUESTED', 'EXCEPTION'].includes(advance.status))
       throw new BadRequestException('Esta solicitud ya no se puede cancelar');
-    await this.prisma.$transaction([
-      this.prisma.advance.update({ where: { id: advanceId }, data: { status: 'CANCELLED' } }),
-      this.prisma.advanceEvent.create({ data: { advanceId, status: 'CANCELLED', note: 'Cancelada por el trabajador', actor: userId } }),
-      this.prisma.incident.updateMany({
+    await this.prisma.$transaction(async (tx) => {
+      await this.transition(tx, advanceId, ['REQUESTED', 'EXCEPTION'], { status: 'CANCELLED' });
+      await tx.advanceEvent.create({ data: { advanceId, status: 'CANCELLED', note: 'Cancelada por el trabajador', actor: userId } });
+      await tx.incident.updateMany({
         where: { advanceId, status: { not: 'RESOLVED' } },
         data: { status: 'RESOLVED', resolution: 'El trabajador canceló la solicitud', resolvedAt: new Date() },
-      }),
-    ]);
+      });
+    });
     return this.detail(advanceId);
   }
 

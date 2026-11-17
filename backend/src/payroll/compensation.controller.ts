@@ -12,16 +12,24 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { IsBoolean, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsArray, IsBoolean, IsDefined, IsInt, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../common/audit.service.js';
 import { type AuthUser, CurrentUser, Roles, requireCompany } from '../common/auth.js';
-import { parseCsv, sum, toCsv } from '../common/util.js';
+import { INT_MAX, csvUpload, parseAmount, parseCsv, sum, toCsv } from '../common/util.js';
 
 class LineFixDto {
   @Type(() => Number) @IsInt() @Min(0) compensatedAmount: number;
   @IsString() @MinLength(3) note: string;
+}
+class AppliedItemDto {
+  @Type(() => String) @IsString() docNumber: string;
+  // Number or text such as "1.500.000"; parsed by parseAmount in the handler.
+  @IsDefined() amount: number | string;
+}
+class AppliedDto {
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => AppliedItemDto) items?: AppliedItemDto[];
 }
 class ReconcileDto {
   @IsOptional() @IsBoolean() force?: boolean;
@@ -83,26 +91,29 @@ export class CompensationController {
   @Roles(...ADMIN) @Post('periods/:id/close')
   async close(@CurrentUser() u: AuthUser, @Param('id') id: string) {
     const companyId = requireCompany(u);
-    const period = await this.period(companyId, id);
-    if (period.status !== 'OPEN') throw new BadRequestException('El periodo ya fue cerrado');
-    const inFlight = await this.prisma.advance.count({ where: { periodId: id, status: { in: ['REQUESTED', 'APPROVED', 'DISBURSING', 'EXCEPTION'] } } });
-    if (inFlight) throw new BadRequestException(`Hay ${inFlight} solicitudes sin terminar. Resuélvelas antes de cerrar.`);
-
-    const [advances, payments] = await Promise.all([
-      this.prisma.advance.findMany({ where: { periodId: id, status: 'DISBURSED' } }),
-      this.prisma.servicePayment.findMany({ where: { periodId: id, status: 'COMPLETED' } }),
-    ]);
-    const byWorker = new Map<string, { count: number; amount: number; fees: number }>();
-    for (const a of advances) {
-      const cur = byWorker.get(a.workerId) ?? { count: 0, amount: 0, fees: 0 };
-      byWorker.set(a.workerId, { count: cur.count + 1, amount: cur.amount + a.amount, fees: cur.fees + a.fee });
-    }
-    for (const p of payments) {
-      const cur = byWorker.get(p.workerId) ?? { count: 0, amount: 0, fees: 0 };
-      byWorker.set(p.workerId, { count: cur.count + 1, amount: cur.amount + p.amount, fees: cur.fees });
-    }
+    await this.period(companyId, id);
 
     await this.prisma.$transaction(async (tx) => {
+      // Row lock: advance retry() reads the period FOR SHARE, so a retry and a close cannot interleave.
+      const [locked] = await tx.$queryRaw<{ status: string }[]>`SELECT status FROM "PayrollPeriod" WHERE id = ${id} FOR UPDATE`;
+      if (locked?.status !== 'OPEN') throw new BadRequestException('El periodo ya fue cerrado');
+      const inFlight = await tx.advance.count({ where: { periodId: id, status: { in: ['REQUESTED', 'APPROVED', 'DISBURSING', 'EXCEPTION'] } } });
+      if (inFlight) throw new BadRequestException(`Hay ${inFlight} solicitudes sin terminar. Resuélvelas antes de cerrar.`);
+
+      const [advances, payments] = await Promise.all([
+        tx.advance.findMany({ where: { periodId: id, status: 'DISBURSED' } }),
+        tx.servicePayment.findMany({ where: { periodId: id, status: 'COMPLETED' } }),
+      ]);
+      const byWorker = new Map<string, { count: number; amount: number; fees: number }>();
+      for (const a of advances) {
+        const cur = byWorker.get(a.workerId) ?? { count: 0, amount: 0, fees: 0 };
+        byWorker.set(a.workerId, { count: cur.count + 1, amount: cur.amount + a.amount, fees: cur.fees + a.fee });
+      }
+      for (const p of payments) {
+        const cur = byWorker.get(p.workerId) ?? { count: 0, amount: 0, fees: 0 };
+        byWorker.set(p.workerId, { count: cur.count + 1, amount: cur.amount + p.amount, fees: cur.fees });
+      }
+
       for (const [workerId, t] of byWorker) {
         await tx.compensationLine.upsert({
           where: { periodId_workerId: { periodId: id, workerId } },
@@ -142,6 +153,7 @@ export class CompensationController {
         toCompensate: sum(lines, (l) => l.toCompensate),
         compensated: sum(lines, (l) => l.compensatedAmount),
         difference: sum(lines, (l) => l.difference),
+        absoluteDifference: sum(lines, (l) => Math.abs(l.difference)),
         withDifferences: lines.filter((l) => l.status === 'DIFFERENCE' || l.status === 'PARTIAL').length,
       },
       lines,
@@ -170,26 +182,33 @@ export class CompensationController {
 
   // The company reports what was actually deducted: JSON body or CSV (documento,valor_descontado).
   @Roles(...ADMIN) @Post('periods/:id/applied')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', csvUpload))
   async applied(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
-    @Body() body: { items?: { docNumber: string; amount: number }[] },
+    @Body() body: AppliedDto,
     @UploadedFile() file?: { buffer: Buffer },
   ) {
     const companyId = requireCompany(u);
     const period = await this.period(companyId, id);
     if (period.status === 'OPEN') throw new BadRequestException('Cierra el periodo antes de conciliar');
     if (period.status === 'RECONCILED') throw new BadRequestException('El periodo ya está conciliado');
-    const items =
+    const reportedItems =
       body.items ??
       (file
         ? parseCsv(file.buffer.toString('utf8')).map((r) => ({
             docNumber: r.documento ?? r.doc ?? '',
-            amount: Number((r.valor_descontado ?? r.valor ?? r.amount ?? '0').replace(/\D/g, '')),
+            // A blank cell means nothing was deducted.
+            amount: r.valor_descontado || r.valor || r.amount || '0',
           }))
         : []);
-    if (!items.length) throw new BadRequestException('Envía los valores descontados');
+    if (!reportedItems.length) throw new BadRequestException('Envía los valores descontados');
+    // Amounts keep their sign; one unreadable value rejects the whole report instead of reconciling on a guess.
+    const items = reportedItems.map((i) => {
+      const amount = parseAmount(i.amount);
+      if (amount === null || Math.abs(amount) > INT_MAX) throw new BadRequestException(`Valor descontado inválido para el documento ${i.docNumber}`);
+      return { docNumber: i.docNumber, amount };
+    });
 
     const lines = await this.prisma.compensationLine.findMany({ where: { periodId: id }, include: { worker: true } });
     // Lines the company doesn't report go back to pending with their full value as difference.
@@ -210,9 +229,9 @@ export class CompensationController {
       });
     }
     const reconciliation = await this.refresh(companyId, id);
-    if (reconciliation.differenceTotal !== 0)
+    if (reconciliation.absoluteDifference !== 0)
       await this.prisma.incident.create({
-        data: { companyId, category: 'RECONCILIATION', title: `Diferencias en la conciliación de ${period.label}`, description: `Diferencia total $${reconciliation.differenceTotal.toLocaleString('es-CO')}` },
+        data: { companyId, category: 'RECONCILIATION', title: `Diferencias en la conciliación de ${period.label}`, description: `Diferencia absoluta $${reconciliation.absoluteDifference.toLocaleString('es-CO')} (neto $${reconciliation.differenceTotal.toLocaleString('es-CO')})` },
       });
     await this.prisma.payrollPeriod.update({ where: { id }, data: { status: 'COMPENSATED' } });
     await this.audit.log({ actorId: u.sub, companyId, entity: 'Reconciliation', entityId: reconciliation.id, action: 'COMPENSATION_REPORTED', data: { items: items.length, unknown } });
@@ -242,8 +261,8 @@ export class CompensationController {
     const period = await this.period(companyId, id);
     if (period.status === 'OPEN') throw new BadRequestException('Cierra el periodo antes de conciliar');
     const rec = await this.refresh(companyId, id);
-    if (rec.differenceTotal !== 0 && !dto.force)
-      throw new BadRequestException(`Quedan diferencias por $${rec.differenceTotal.toLocaleString('es-CO')}. Resuélvelas o fuerza el cierre con una nota.`);
+    if (rec.absoluteDifference !== 0 && !dto.force)
+      throw new BadRequestException(`Quedan diferencias por $${rec.absoluteDifference.toLocaleString('es-CO')}. Resuélvelas o fuerza el cierre con una nota.`);
     if (dto.force && !dto.note) throw new BadRequestException('Explica por qué cierras con diferencias');
     await this.prisma.$transaction([
       this.prisma.reconciliation.update({ where: { periodId: id }, data: { status: 'RECONCILED', closedAt: new Date(), closedBy: u.sub } }),
@@ -253,7 +272,7 @@ export class CompensationController {
         data: { status: 'RESOLVED', resolution: dto.note ?? 'Conciliación cerrada sin diferencias', resolvedById: u.sub, resolvedAt: new Date() },
       }),
     ]);
-    await this.audit.log({ actorId: u.sub, companyId, entity: 'Reconciliation', entityId: rec.id, action: 'RECONCILED', data: { differenceTotal: rec.differenceTotal, note: dto.note } });
+    await this.audit.log({ actorId: u.sub, companyId, entity: 'Reconciliation', entityId: rec.id, action: 'RECONCILED', data: { differenceTotal: rec.differenceTotal, absoluteDifference: rec.absoluteDifference, note: dto.note } });
     return this.detail(u, id);
   }
 
@@ -292,11 +311,15 @@ export class CompensationController {
     const lines = await this.prisma.compensationLine.findMany({ where: { periodId } });
     const disbursedTotal = sum(lines, (l) => l.toCompensate);
     const compensatedTotal = sum(lines, (l) => l.compensatedAmount);
+    // Net for display; pass/fail uses the sum of per-line gaps so opposite-sign differences cannot cancel out.
     const differenceTotal = disbursedTotal - compensatedTotal;
-    return this.prisma.reconciliation.upsert({
+    const absoluteDifference = sum(lines, (l) => Math.abs(l.toCompensate - l.compensatedAmount));
+    const status = absoluteDifference ? 'WITH_DIFFERENCES' : 'IN_PROGRESS';
+    const rec = await this.prisma.reconciliation.upsert({
       where: { periodId },
-      create: { companyId, periodId, disbursedTotal, compensatedTotal, differenceTotal, status: differenceTotal ? 'WITH_DIFFERENCES' : 'IN_PROGRESS' },
-      update: { disbursedTotal, compensatedTotal, differenceTotal, status: differenceTotal ? 'WITH_DIFFERENCES' : 'IN_PROGRESS' },
+      create: { companyId, periodId, disbursedTotal, compensatedTotal, differenceTotal, status },
+      update: { disbursedTotal, compensatedTotal, differenceTotal, status },
     });
+    return { ...rec, absoluteDifference };
   }
 }
