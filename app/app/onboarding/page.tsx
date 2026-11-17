@@ -154,7 +154,7 @@ function KycStep({ profile, onDone }: { profile: Profile; onDone: () => void }) 
     setPhase("checking");
     setError(null);
     try {
-      const [r] = await Promise.all([api<KycResult>("/worker/kyc", { body: { selfieScore: 0.92 } }), new Promise((ok) => setTimeout(ok, 1200))]);
+      const [r] = await Promise.all([api<KycResult>("/worker/kyc", { method: "POST" }), new Promise((ok) => setTimeout(ok, 1200))]);
       setStatus(r.status);
       setPhase("intro");
       if (r.status === "APPROVED") onDone();

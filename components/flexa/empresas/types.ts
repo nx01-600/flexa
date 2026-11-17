@@ -163,6 +163,7 @@ export type Ticket = {
   status: string;
   createdAt: string;
   updatedAt: string;
+  userId?: string;
   user: { name: string; role: string; email?: string };
   _count?: { messages: number };
   messages?: { id: string; body: string; createdAt: string; author: { name: string; role: string } }[];

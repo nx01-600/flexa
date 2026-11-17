@@ -206,8 +206,14 @@ export default function Workers() {
         danger={bulk === false}
         note={bulk ? undefined : { label: "Motivo", placeholder: "Ej. Fin de contrato, revisión interna…" }}
         onConfirm={async (reason) => {
-          const r = await api<{ updated: number }>("/company/workers/access", { body: { ids: [...selected], enabled: bulk, reason: reason || undefined } });
-          setMsg(`${r.updated} trabajadores ${bulk ? "habilitados" : "deshabilitados"}.`);
+          // The API takes at most 500 ids per call.
+          const ids = [...selected];
+          let updated = 0;
+          for (let i = 0; i < ids.length; i += 500) {
+            const r = await api<{ updated: number }>("/company/workers/access", { body: { ids: ids.slice(i, i + 500), enabled: bulk, reason: reason || undefined } });
+            updated += r.updated;
+          }
+          setMsg(`${updated} trabajadores ${bulk ? "habilitados" : "deshabilitados"}.`);
           setSelected(new Set());
           refresh();
         }}

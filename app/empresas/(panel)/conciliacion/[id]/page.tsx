@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils";
 type Detail = {
   period: Period;
   reconciliation: Reconciliation | null;
-  totals: { workers: number; toCompensate: number; compensated: number; difference: number; withDifferences: number };
+  // difference is net; absoluteDifference sums per-line gaps, is what the backend checks to reconcile, and is what the page shows.
+  totals: { workers: number; toCompensate: number; compensated: number; difference: number; absoluteDifference: number; withDifferences: number };
   lines: CompLine[];
 };
 
@@ -69,7 +70,7 @@ export default function CompensationPeriod() {
             ["Trabajadores", t.workers],
             ["A compensar", money(t.toCompensate)],
             ["Descontado en nómina", money(t.compensated)],
-            ["Diferencia", <span key="d" className={cn(t.difference ? "text-warning" : "text-green-700")}>{money(t.difference)}</span>],
+            ["Diferencia", <span key="d" className={cn(t.absoluteDifference ? "text-warning" : "text-green-700")}>{money(t.absoluteDifference)}</span>],
           ]}
         />
       </SectionCard>
@@ -94,7 +95,7 @@ export default function CompensationPeriod() {
             </div>
           )}
         </Step>
-        <Step n={4} title="Conciliar" text={t.difference ? "Resuelve las diferencias o cierra con una nota." : "Sin diferencias: listo para cerrar."} done={reconciled} disabled={open}>
+        <Step n={4} title="Conciliar" text={t.absoluteDifference ? "Resuelve las diferencias o cierra con una nota." : "Sin diferencias: listo para cerrar."} done={reconciled} disabled={open}>
           {!open && !reconciled && canWrite && <Button size="sm" onClick={() => setDialog("reconcile")}><BadgeCheck />Conciliar</Button>}
         </Step>
       </div>
@@ -173,7 +174,7 @@ export default function CompensationPeriod() {
         }}
       />
       <AppliedUpload open={dialog === "applied"} onClose={() => setDialog(null)} periodId={p.id} onDone={done} />
-      <ReconcileDialog open={dialog === "reconcile"} onClose={() => setDialog(null)} periodId={p.id} difference={t.difference} onDone={() => done("Periodo conciliado.")} />
+      <ReconcileDialog open={dialog === "reconcile"} onClose={() => setDialog(null)} periodId={p.id} difference={t.absoluteDifference} onDone={() => done("Periodo conciliado.")} />
       <FixDialog line={fix} onClose={() => setFix(null)} onDone={() => done("Línea ajustada.")} />
     </>
   );

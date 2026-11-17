@@ -79,7 +79,13 @@ export async function api<T = unknown>(
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const msg = Array.isArray(body.message) ? body.message[0] : body.message;
+    // The auth endpoints are rate limited; the throttler's own message is in English, and so is multer's 413 for uploads.
+    const msg =
+      res.status === 429
+        ? "Demasiados intentos. Espera un minuto e intenta de nuevo."
+        : res.status === 413
+          ? "El archivo supera el máximo de 5 MB."
+          : Array.isArray(body.message) ? body.message[0] : body.message;
     throw new ApiError(msg ?? "Algo salió mal. Intenta de nuevo.", res.status, body);
   }
   if (opts.raw) return (await res.text()) as T;

@@ -79,7 +79,9 @@ export default function Withdraw() {
       active ? "bg-btn-primary text-white shadow-btn" : "bg-surface text-ink shadow-sm ring-1 ring-line hover:bg-green-50",
     );
 
-  const quick = e ? [...new Set([e.recommended, 50_000, 100_000].filter((q) => q >= e.limits.minAmount && q <= e.available))].slice(0, 3) : [];
+  // The fee is discounted from the available too, so the largest amount the backend accepts is available - fee.
+  const maxAmount = e ? Math.max(0, Math.min(e.available - e.limits.feePerRequest, e.limits.maxAmountPerRequest)) : 0;
+  const quick = e ? [...new Set([e.recommended, 50_000, 100_000].filter((q) => q >= e.limits.minAmount && q <= maxAmount))].slice(0, 3) : [];
 
   return (
     <>
@@ -158,7 +160,7 @@ export default function Withdraw() {
                   : high
                     ? `Supera el recomendado de ${money(current!.recommended)}.`
                     : e
-                      ? `Mínimo ${money(e.limits.minAmount)}, máximo ${money(Math.min(e.available, e.limits.maxAmountPerRequest))}. La línea marca el recomendado.`
+                      ? `Mínimo ${money(e.limits.minAmount)}, máximo ${money(maxAmount)}. La línea marca el recomendado.`
                       : " "}
             </p>
           </div>
@@ -170,7 +172,7 @@ export default function Withdraw() {
                   {money(q)}
                 </button>
               ))}
-              <button type="button" onClick={() => setAmount(e.available)} className={chip(amount === e.available)}>
+              <button type="button" onClick={() => setAmount(maxAmount)} className={chip(amount === maxAmount)}>
                 Todo
               </button>
             </div>

@@ -215,7 +215,7 @@ export default function CompanyDetail() {
                         <Td>{p.reconciliation ? <Status value={p.reconciliation.status} /> : <span className="text-ink-3">—</span>}</Td>
                         <Td className="text-right tabular-nums">{p.reconciliation ? money(p.reconciliation.disbursedTotal) : "—"}</Td>
                         <Td className="text-right tabular-nums">{p.reconciliation ? money(p.reconciliation.compensatedTotal) : "—"}</Td>
-                        <Td className={`text-right font-bold tabular-nums ${p.reconciliation?.differenceTotal ? "text-danger" : ""}`}>{p.reconciliation ? money(p.reconciliation.differenceTotal) : "—"}</Td>
+                        <Td className={`text-right font-bold tabular-nums ${p.reconciliation && (p.reconciliation.differenceTotal || p.reconciliation.status === "WITH_DIFFERENCES") ? "text-danger" : ""}`}>{p.reconciliation ? money(p.reconciliation.differenceTotal) : "—"}</Td>
                       </tr>
                     ))}
                   </tbody>

@@ -61,7 +61,7 @@ export default function PeriodDetail() {
       />
       {msg && <Notice onClose={() => setMsg(null)}>{msg}</Notice>}
       <SectionCard>
-        <CardHead title="Totales del periodo" action={<Button variant="outline" size="sm" onClick={() => setBudget(true)}><PencilIcon className="text-green-700" />Presupuesto</Button>} />
+        <CardHead title="Totales del periodo" action={canWrite && <Button variant="outline" size="sm" onClick={() => setBudget(true)}><PencilIcon className="text-green-700" />Presupuesto</Button>} />
         <Facts
           cols={4}
           items={[

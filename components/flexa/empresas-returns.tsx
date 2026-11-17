@@ -93,7 +93,7 @@ export function ReturnsView() {
                 <Td><Link href={`/empresas/conciliacion/${r.periodId}`} className="font-bold text-green-700 hover:underline">{r.period?.label}</Link></Td>
                 <Td className="text-right tabular-nums">{money(r.disbursedTotal)}</Td>
                 <Td className="text-right tabular-nums">{money(r.compensatedTotal)}</Td>
-                <Td className={r.differenceTotal ? "text-right font-bold text-warning tabular-nums" : "text-right text-ink-2 tabular-nums"}>{money(r.differenceTotal)}</Td>
+                <Td className={r.differenceTotal || r.status === "WITH_DIFFERENCES" ? "text-right font-bold text-warning tabular-nums" : "text-right text-ink-2 tabular-nums"}>{money(r.differenceTotal)}</Td>
                 <Td className="text-ink-2">{dateFmt(r.closedAt)}</Td>
                 <Td><ReconBadge value={r.status} /></Td>
               </tr>

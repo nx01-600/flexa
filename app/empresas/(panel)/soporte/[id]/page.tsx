@@ -22,6 +22,9 @@ export default function TicketDetail() {
   if (loading && !t) return <PageLoading />;
   if (error || !t) return <ErrorState error={error} onRetry={reload} />;
   const closed = t.status === "CLOSED";
+  // Mirrors the API: Finance replies only on tickets it opened, and only the worker or FLEXA closes a worker ticket.
+  const canReply = session?.user.role !== "COMPANY_FINANCE" || t.userId === session.user.sub;
+  const canClose = t.user.role !== "WORKER";
   const thread = [{ id: "first", body: t.description, createdAt: t.createdAt, author: t.user }, ...(t.messages ?? [])];
 
   return (
@@ -33,7 +36,7 @@ export default function TicketDetail() {
         action={
           <>
             <TicketBadge value={t.status} />
-            {!closed && <Button variant="outline" size="md" onClick={() => setClosing(true)}>Cerrar solicitud</Button>}
+            {!closed && canClose && <Button variant="outline" size="md" onClick={() => setClosing(true)}>Cerrar solicitud</Button>}
           </>
         }
       />
@@ -59,6 +62,8 @@ export default function TicketDetail() {
         </ol>
         {closed ? (
           <Notice tone="amber">La solicitud está cerrada. Si necesitas algo más, crea una nueva.</Notice>
+        ) : !canReply ? (
+          <p className="border-t border-line-soft pt-4 text-[14px] font-medium text-ink-2">Solo el administrador de la empresa puede responder esta solicitud.</p>
         ) : (
           <form
             className="flex flex-col gap-3 border-t border-line-soft pt-4"
