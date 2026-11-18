@@ -25,7 +25,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Principal"
-      className="fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 mx-auto max-w-[406px] rounded-xl bg-surface/95 shadow-[0_-8px_24px_rgb(20_61_34/0.08),0_12px_32px_-12px_rgb(20_61_34/0.25)] ring-1 ring-black/[0.03] backdrop-blur"
+      className="fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-40 mx-auto max-w-[406px] rounded-xl bg-surface/95 shadow-[0_-8px_24px_rgb(20_61_34/0.08),0_12px_32px_-12px_rgb(20_61_34/0.25)] ring-1 ring-black/[0.03] backdrop-blur md:hidden"
     >
       <ul className="grid grid-cols-4 p-1.5">
         {tabs.map(({ href, label, icon: Icon }) => {
@@ -53,14 +53,54 @@ export function BottomNav() {
   );
 }
 
+// md+ replacement for BottomNav: a sticky floating card on the left with the same 4 tabs.
+// Compact rail (icon over label) at md, full-width rail (icon beside label) at lg.
+// It is a sibling of the content, never a parent, so each screen's Backdrop still anchors
+// to the worker root.
+export function SideNav() {
+  const path = usePathname();
+  return (
+    <aside className="sticky top-3 m-3 mr-0 hidden h-[calc(100dvh-1.5rem)] w-[88px] shrink-0 flex-col self-start rounded-xl bg-surface/95 p-2 shadow-raised ring-1 ring-black/[0.03] backdrop-blur md:flex lg:w-[232px] lg:p-3">
+      <Link href="/app" aria-label="Flexa, inicio" className="mx-auto mt-3 mb-5 lg:mx-0 lg:mt-2 lg:mb-6 lg:px-3">
+        <Logo className="h-5 lg:h-7" />
+      </Link>
+      <nav aria-label="Principal">
+        <ul className="flex flex-col gap-1">
+          {tabs.map(({ href, label, icon: Icon }) => {
+            const active = isActive(path, href);
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1 rounded-lg py-2 text-xs transition-colors duration-150 lg:h-14 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-md lg:px-3 lg:py-0 lg:text-base",
+                    active ? "font-bold text-green-700 lg:bg-green-100 lg:text-green-900" : "font-semibold text-ink-2 hover:text-ink lg:hover:bg-green-50",
+                  )}
+                >
+                  <span className={cn("grid h-8 w-14 place-items-center rounded-full transition-colors duration-200 lg:h-auto lg:w-auto", active && "bg-green-100 lg:bg-transparent")}>
+                    <Icon className={cn("size-[22px]", active && "stroke-[2.5]")} />
+                  </span>
+                  {label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </aside>
+  );
+}
+
 // Round white button used for back / close / menu in headers.
 const roundBtn =
   "grid size-10 place-items-center rounded-full bg-surface text-ink shadow-sm ring-1 ring-black/[0.03] transition-transform duration-150 active:scale-95 [&_svg]:size-5 [&_svg]:stroke-[2.5]";
 
-export function TopBar({ title, back = "/app", action }: { title: string; back?: string; action?: ReactNode }) {
+// `tab`: pass on the 4 tab screens, where the side nav replaces the back arrow from md up.
+export function TopBar({ title, back = "/app", action, tab }: { title: string; back?: string; action?: ReactNode; tab?: boolean }) {
   return (
     <header className="grid h-16 grid-cols-[40px_1fr_40px] items-center gap-2 px-5 pt-2">
-      <Link href={back} aria-label="Volver" className={roundBtn}>
+      <Link href={back} aria-label="Volver" className={cn(roundBtn, tab && "md:invisible")}>
         <ChevronLeft />
       </Link>
       <h1 className="text-center text-lg font-extrabold tracking-[-0.01em] text-ink">{title}</h1>

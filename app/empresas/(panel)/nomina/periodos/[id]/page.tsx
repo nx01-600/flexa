@@ -79,7 +79,7 @@ export default function PeriodDetail() {
         {entries.length ? (
           <Table>
             <thead>
-              <tr><Th>Trabajador</Th><Th className="text-right">Salario</Th><Th className="text-right">Días</Th><Th className="text-right">Horas extra</Th><Th className="text-right">Valor h. extra</Th><Th className="text-right">Recargos</Th><Th className="text-right">Deducciones</Th>{canWrite && open && <Th className="w-28"><span className="sr-only">Acciones</span></Th>}</tr>
+              <tr><Th>Trabajador</Th><Th className="text-right">Salario</Th><Th className="text-right">Días</Th><Th className="text-right">Horas extra</Th><Th className="text-right">Valor h. extra</Th><Th className="text-right">Recargos</Th><Th className="text-right">Deducciones</Th>{canWrite && open && <Th className="relative w-28"><span className="sr-only">Acciones</span></Th>}</tr>
             </thead>
             <tbody>
               {entries.map((e) => (

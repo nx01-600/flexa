@@ -35,14 +35,14 @@ export default function SettingsPage() {
     <>
       <PageHeader title="Configuración" sub="Datos de la empresa, reglas de anticipos, sedes y cuentas de tu equipo." />
 
-      <Card tone="mint" className="relative isolate flex flex-wrap items-center gap-6 overflow-hidden p-6">
+      <Card tone="mint" className="relative isolate flex flex-wrap items-center gap-6 overflow-hidden p-4 sm:p-6">
         <Blob shape={2} tone="deep" className="-top-20 -right-16 -z-10 h-[220px] w-[360px] opacity-60" />
         <IconBox tone="solid" size="lg" halo className="ring-white/70"><Building2 /></IconBox>
         <div className="flex flex-1 flex-col gap-0.5">
           <h2 className="text-h2 text-green-900">{c.name}</h2>
           <p className="text-sm font-semibold text-green-800">NIT {c.nit} · {c.integrationType === "ERP_API" ? `ERP ${c.erpName ?? ""}` : "Carga por archivo"}</p>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 lg:w-auto">
           {[
             ["Trabajadores", c.workers],
             ["Habilitados", c.enabledWorkers],
@@ -54,7 +54,7 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
-        <div className="flex w-full items-center gap-3 text-[13px] font-semibold text-green-800">
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] font-semibold text-green-800 lg:flex-nowrap">
           Integración <IntegrationBadge value={c.integrationStatus} /> · {money(c.pricePerWorker)} por trabajador habilitado
         </div>
       </Card>
@@ -161,7 +161,7 @@ function RulesForm({ canWrite }: { canWrite: boolean }) {
         )}
         {saved && <Notice onClose={() => setSaved(false)}>Reglas actualizadas.</Notice>}
         {canWrite ? (
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" size="md" disabled={!dirty} onClick={() => setDraft({})}>Descartar</Button>
             <Button type="submit" size="md" disabled={!dirty || action.busy}>{action.busy ? "Guardando…" : "Guardar reglas"}</Button>
           </div>
@@ -191,11 +191,11 @@ function SitesCard({ canWrite }: { canWrite: boolean }) {
           {data?.map((s) => (
             <li key={s.id} className="flex items-center gap-3 rounded-md bg-[#f6faf5] p-3">
               <IconBox tone="white" size="sm"><MapPin /></IconBox>
-              <span className="flex flex-1 flex-col">
+              <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-[15px] font-bold text-ink">{s.name}</span>
                 <span className="text-[13px] font-medium text-ink-2">{s.city}</span>
               </span>
-              <span className="text-sm font-semibold text-ink-2 tabular-nums">{s._count?.workers ?? 0} trabajadores</span>
+              <span className="shrink-0 text-sm font-semibold text-ink-2 tabular-nums">{s._count?.workers ?? 0} trabajadores</span>
             </li>
           ))}
         </ul>

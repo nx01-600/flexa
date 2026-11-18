@@ -72,7 +72,7 @@ export default function Services() {
           </IconBox>
           <div className="flex flex-col gap-1">
             <h2 className="text-h2 text-ink">Paga tus servicios con lo que ya ganaste</h2>
-            <p className="max-w-[32ch] text-sm font-medium text-green-900">
+            <p className="max-w-[32ch] text-sm font-medium text-green-900 md:max-w-none">
               Se descuenta de tu disponible y de tu próximo pago de nómina, igual que un retiro.
             </p>
           </div>
@@ -86,7 +86,7 @@ export default function Services() {
 
         <section className="flex flex-col gap-3">
           <h2 className="text-h3 text-ink">¿Qué quieres pagar?</h2>
-          <ul className="grid grid-cols-2 gap-3">
+          <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
             {services.map((s) => (
               <li key={s.label}>
                 <button type="button" onClick={() => start(s)} className="h-full w-full text-left transition-transform duration-150 active:scale-[0.98]">
@@ -107,7 +107,7 @@ export default function Services() {
       </main>
 
       <Sheet open={!!open} onOpenChange={(o) => !o && !busy && setOpen(null)}>
-        <SheetContent side="bottom" showCloseButton={false} className="mx-auto max-h-[92dvh] max-w-[430px] gap-0 overflow-y-auto rounded-t-2xl border-0 bg-page p-0">
+        <SheetContent side="bottom" showCloseButton={false} className="mx-auto max-h-[92dvh] max-w-[430px] gap-0 overflow-y-auto rounded-t-2xl border-0 bg-page p-0 md:data-[side=bottom]:bottom-6 md:max-h-[calc(100dvh-3rem)] md:max-w-[520px] md:rounded-2xl">
           {open && (
             <div className="flex flex-col gap-4 px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))]">
               <div className="flex items-center gap-3">

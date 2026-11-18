@@ -58,7 +58,7 @@ export default function CompanyHome() {
     <>
       <PageHeader title={first ? `¡Hola, ${first}!` : "Inicio"} sub={p ? `Resumen de la actividad de tu empresa en ${p.label}.` : "No hay un periodo de nómina abierto."} />
 
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={Users} value={o.workers.total} label="Trabajadores en nómina" tone="green" />
         <Kpi icon={Smartphone} value={o.workers.enabled} label="Habilitados en Flexa" tone="teal" trend={`${accessPct}%`} />
         <Kpi icon={HandCoins} value={o.ewa.withdrawals} label="Retiros del periodo" tone="amber" trend={o.ewa.vsPrevious ? <Delta value={o.ewa.vsPrevious.changePct} /> : undefined} />
@@ -66,9 +66,9 @@ export default function CompanyHome() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
-        <Card className="flex flex-col gap-5 p-6">
+        <Card className="flex min-w-0 flex-col gap-5 p-4 sm:p-6 lg:min-w-auto">
           <CardHead title="Retiros de los trabajadores" sub="Monto retirado por semana del periodo" href="/empresas/rendimientos" />
-          <div className="flex flex-wrap gap-8">
+          <div className="flex flex-wrap gap-x-8 gap-y-4 lg:gap-y-8">
             <Stat label="Total del periodo" value={money(o.ewa.withdrawn)} />
             <Stat label="Retiro promedio" value={money(s?.averageAmount)} />
             <Stat label="Usuarios activos" value={s ? `${s.activeUsers} · ${s.adoptionPct}%` : "—"} />
@@ -77,7 +77,7 @@ export default function CompanyHome() {
           {usage.error ? <ErrorState error={usage.error} onRetry={usage.reload} /> : usage.data ? <Bars data={usage.data.weekly} x="week" height={250} highlightLast={false} /> : <Loading rows={4} />}
         </Card>
 
-        <Card className="flex flex-col gap-4 p-6">
+        <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6 lg:min-w-auto">
           <CardHead title="Para atender" sub="Lo que requiere acción de tu equipo" />
           {o.attention.length ? (
             <ul className="flex flex-1 flex-col gap-2.5">
@@ -101,7 +101,7 @@ export default function CompanyHome() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_1.45fr]">
-        <Card tone="mint" className="relative isolate flex flex-col justify-between gap-5 overflow-hidden p-6">
+        <Card tone="mint" className="relative isolate flex min-w-0 flex-col justify-between gap-5 overflow-hidden p-4 sm:p-6 lg:min-w-auto">
           <Blob shape={0} tone="deep" className="-right-16 -bottom-20 -z-10 size-[240px] opacity-60" />
           <div className="flex items-center gap-3.5">
             <IconBox tone="dark" size="lg"><CalendarClock /></IconBox>
@@ -130,7 +130,7 @@ export default function CompanyHome() {
           <ButtonLink href="/empresas/nomina" size="md">Ver estado de la nómina</ButtonLink>
         </Card>
 
-        <Card className="flex flex-col gap-3 p-6">
+        <Card className="flex min-w-0 flex-col gap-3 p-4 sm:p-6 lg:min-w-auto">
           <CardHead title="Últimas solicitudes" sub="Movimientos recientes de tus trabajadores" action={<MoreLink href="/empresas/operaciones">Ver todas</MoreLink>} />
           {recent.error ? (
             <ErrorState error={recent.error} onRetry={recent.reload} />
@@ -144,7 +144,7 @@ export default function CompanyHome() {
                 const name = `${r.worker?.firstName} ${r.worker?.lastName}`;
                 return (
                   <li key={r.id} className="border-b border-line-soft last:border-0">
-                    <Link href={`/empresas/operaciones/${r.id}`} className="-mx-2 flex h-16 items-center gap-3.5 rounded-md px-2 transition-colors hover:bg-mint-1">
+                    <Link href={`/empresas/operaciones/${r.id}`} className="-mx-2 flex min-h-16 items-center gap-3.5 rounded-md px-2 py-2 transition-colors hover:bg-mint-1 lg:h-16 lg:py-0">
                       <Avatar name={name} className="size-10" />
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate text-[15px] font-bold text-ink">{name}</span>
@@ -152,8 +152,11 @@ export default function CompanyHome() {
                           {r.worker?.site?.name ?? "Sin sede"} · {dateFmt(r.createdAt, { day: "numeric", month: "short" })}, {timeFmt(r.createdAt)}
                         </span>
                       </span>
-                      <AdvanceBadge value={r.status} />
-                      <span className="w-28 text-right text-[15px] font-bold text-ink tabular-nums">{money(r.amount)}</span>
+                      {/* Below sm the amount sits above the badge; from sm the wrapper vanishes and the row is as before. */}
+                      <span className="flex shrink-0 flex-col-reverse items-end gap-1 sm:contents">
+                        <AdvanceBadge value={r.status} />
+                        <span className="text-right text-[15px] font-bold text-ink tabular-nums sm:w-28">{money(r.amount)}</span>
+                      </span>
                     </Link>
                   </li>
                 );
@@ -177,9 +180,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-white/80 p-3.5 shadow-xs">
+    <div className="min-w-0 rounded-md bg-white/80 p-3 shadow-xs sm:p-3.5">
       <span className="text-[13px] font-semibold text-ink-2">{label}</span>
-      <p className="text-lg font-extrabold tracking-[-0.02em] text-ink tabular-nums">{value}</p>
+      <p className="text-base font-extrabold tracking-[-0.02em] text-ink tabular-nums sm:text-lg">{value}</p>
     </div>
   );
 }

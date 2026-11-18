@@ -62,7 +62,7 @@ export function PayrollStatus({ onUpload }: { onUpload: () => void }) {
     );
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={BadgeCheck} value={`${s.coveragePct}%`} label={`Cobertura de ${s.period.label}`} tone={s.coveragePct === 100 ? "green" : "amber"} />
         <Kpi icon={Users} value={s.missingWorkers?.length ?? 0} label="Habilitados sin información" tone={s.missingWorkers?.length ? "amber" : "teal"} />
         <Kpi icon={TriangleAlert} value={s.openIssues ?? 0} label="Inconsistencias sin resolver" tone={s.openIssues ? "red" : "green"} />
@@ -231,8 +231,8 @@ function PeriodDialog({ open, onClose, onDone }: { open: boolean; onClose: () =>
         </>
       }
     >
-      <div className="grid grid-cols-2 gap-4">
-        <FormField label="Nombre" className="col-span-2"><TextInput name="label" required defaultValue={label} /></FormField>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormField label="Nombre" className="sm:col-span-2"><TextInput name="label" required defaultValue={label} /></FormField>
         <FormField label="Inicio"><TextInput name="startDate" type="date" required defaultValue={isoDay(start)} /></FormField>
         <FormField label="Fin"><TextInput name="endDate" type="date" required defaultValue={isoDay(end)} /></FormField>
         <FormField label="Fecha de pago"><TextInput name="payDate" type="date" required defaultValue={isoDay(end)} /></FormField>
@@ -293,8 +293,8 @@ export function NoveltiesTab({ periods }: { periods: Period[] }) {
         title="Novedades de nómina"
         sub="Incapacidades, vacaciones, ausencias y ajustes que afectan el devengado"
         action={
-          <div className="flex items-center gap-3">
-            <Select aria-label="Periodo" value={periodId} onChange={(e) => setPeriodId(e.target.value)} options={periods.map((p) => ({ value: p.id, label: p.label }))} placeholder="Todos los periodos" className="w-48" />
+          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto lg:flex-nowrap">
+            <Select aria-label="Periodo" value={periodId} onChange={(e) => setPeriodId(e.target.value)} options={periods.map((p) => ({ value: p.id, label: p.label }))} placeholder="Todos los periodos" className="w-full sm:w-48" />
             {canWrite && <Button size="sm" onClick={() => setCreate(true)}><Plus />Registrar novedad</Button>}
           </div>
         }
@@ -368,8 +368,8 @@ function NoveltyDialog({ open, onClose, onDone, periods }: { open: boolean; onCl
         </>
       }
     >
-      <div className="grid grid-cols-2 gap-4">
-        <FormField label="Trabajador" className="col-span-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormField label="Trabajador" className="sm:col-span-2">
           <Select name="workerId" required options={(workers.data ?? []).map((w) => ({ value: w.id, label: `${w.name} · ${w.docNumber}` }))} placeholder={workers.loading ? "Cargando…" : "Elige un trabajador"} />
         </FormField>
         <FormField label="Tipo"><Select name="type" required options={Object.entries(noveltyTypes).map(([value, label]) => ({ value, label }))} /></FormField>
@@ -377,7 +377,7 @@ function NoveltyDialog({ open, onClose, onDone, periods }: { open: boolean; onCl
         <FormField label="Fecha"><TextInput name="date" type="date" defaultValue={isoDay(new Date())} /></FormField>
         <FormField label="Días"><TextInput name="days" type="number" min={0} max={31} /></FormField>
         <FormField label="Valor (si aplica)"><TextInput name="amount" inputMode="numeric" /></FormField>
-        <FormField label="Descripción" className="col-span-2"><TextArea name="description" required minLength={3} /></FormField>
+        <FormField label="Descripción" className="sm:col-span-2"><TextArea name="description" required minLength={3} /></FormField>
       </div>
       {error && <Notice tone="red">{error}</Notice>}
     </Dialog>

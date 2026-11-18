@@ -43,9 +43,10 @@ export function ProfileScreen() {
   return (
     <>
       <Backdrop variant="inner" wash />
-      <TopBar title="Mi perfil" />
-      <main className="flex flex-col gap-5 px-5 pt-3">
-        <section className="flex flex-col items-center gap-3 text-center">
+      <TopBar title="Mi perfil" tab />
+      {/* lg: identity + help/logout in a left column, the tabbed content on the right (grid placement keeps the DOM order). */}
+      <main className="flex flex-col gap-5 px-5 pt-3 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-5">
+        <section className="flex flex-col items-center gap-3 text-center lg:col-start-1 lg:row-start-1">
           <span className="size-[88px] overflow-hidden rounded-full shadow-card ring-[5px] ring-white">
             {p ? <Avatar name={`${p.firstName} ${p.lastName}`} size={88} priority className="size-full" /> : <Skeleton className="size-full rounded-full" />}
           </span>
@@ -73,16 +74,18 @@ export function ProfileScreen() {
           )}
         </section>
 
-        {profile.error && <ErrorState error={profile.error} onRetry={profile.reload} />}
+        <div className="contents lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:flex-col lg:gap-5">
+          {profile.error && <ErrorState error={profile.error} onRetry={profile.reload} />}
 
-        <PillTabs variant="segmented" options={views} value={view} onChange={(v) => router.replace(v === "datos" ? path : `${path}?vista=${v}`, { scroll: false })} />
+          <PillTabs variant="segmented" options={views} value={view} onChange={(v) => router.replace(v === "datos" ? path : `${path}?vista=${v}`, { scroll: false })} />
 
-        {view === "datos" && p && <PersonalData profile={p} onSaved={profile.reload} />}
-        {view === "datos" && !p && profile.loading && <LoadingCards count={2} />}
-        {view === "cuentas" && <Accounts />}
-        {view === "documentos" && <Documents />}
+          {view === "datos" && p && <PersonalData profile={p} onSaved={profile.reload} />}
+          {view === "datos" && !p && profile.loading && <LoadingCards count={2} />}
+          {view === "cuentas" && <Accounts />}
+          {view === "documentos" && <Documents />}
+        </div>
 
-        <Card tone="soft" className="overflow-hidden">
+        <Card tone="soft" className="overflow-hidden lg:col-start-1 lg:row-start-2">
           <Link href="/app/ayuda" className="group flex items-center gap-3 pl-4 transition-colors hover:bg-green-50/70">
             <IconBox size="sm">
               <CircleHelp />

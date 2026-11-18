@@ -32,14 +32,14 @@ export default function Returns() {
   const peak = u?.weekday.reduce((a, b) => (b.value > a.value ? b : a), u.weekday[0]);
   return (
     <>
-      <PageHeader title="Rendimientos" sub="Cómo usan Flexa tus trabajadores: montos, días, categorías y sedes." action={<PillTabs options={ranges} value={months} onChange={setMonths} />} />
+      <PageHeader title="Rendimientos" sub="Cómo usan Flexa tus trabajadores: montos, días, categorías y sedes." action={<PillTabs options={ranges} value={months} onChange={setMonths} className="flex-wrap lg:flex-nowrap" />} />
       {loading && !u ? (
         <PageLoading />
       ) : error || !u ? (
         <ErrorState error={error} onRetry={reload} />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Kpi icon={Banknote} value={money(u.totals.withdrawn)} label="Retirado en el rango" />
             <Kpi icon={HandCoins} value={u.totals.withdrawals} label="Retiros" tone="teal" />
             <Kpi icon={Users} value={u.totals.users} label="Trabajadores que usaron Flexa" tone="green" />

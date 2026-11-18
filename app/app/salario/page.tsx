@@ -26,7 +26,9 @@ export default function Salary() {
   const l = e.limits;
 
   return (
-    <ScreenFrame title="Mi salario">
+    <ScreenFrame title="Mi salario" className="md:grid md:grid-cols-2 md:grid-rows-[auto_1fr] md:items-start">
+      {/* md+: the calculation card spans two rows on the right; summary (wrapper, display:contents below md) and company rules stack on the left. */}
+      <div className="contents md:flex md:flex-col md:gap-4">
       <Card tone="mint" className="flex items-center gap-5 p-5">
         <Donut size={112} thickness={16} data={[{ name: "Devengado", value: e.grossEarned }, { name: "Por devengar", value: Math.max(e.periodSalary - e.grossEarned, 0) }]}>
           <span className="flex flex-col items-center">
@@ -57,8 +59,9 @@ export default function Salary() {
           ))}
         </Notice>
       )}
+      </div>
 
-      <Card tone="soft" className="flex flex-col gap-4 p-5">
+      <Card tone="soft" className="flex flex-col gap-4 p-5 md:col-start-2 md:row-span-2 md:row-start-1">
         <h2 className="text-h3 text-ink">¿Cómo calculamos tu disponible?</h2>
         {explanation.data ? (
           <>
@@ -103,7 +106,7 @@ export default function Salary() {
         ))}
       </Card>
 
-      <div className="flex flex-col gap-2 rounded-md px-1 text-[13px] font-medium text-ink-2">
+      <div className="flex flex-col gap-2 rounded-md px-1 text-[13px] font-medium text-ink-2 md:col-span-2">
         {e.period && (
           <span className="flex items-center gap-2">
             <IconBox size="sm" tone="gray">
@@ -121,7 +124,7 @@ export default function Salary() {
       </div>
 
       {e.canRequest && (
-        <ButtonLink href="/app/retirar" className="mt-2">
+        <ButtonLink href="/app/retirar" className="mt-2 md:col-span-2 md:mx-auto md:w-full md:max-w-sm">
           Retirar ahora
         </ButtonLink>
       )}

@@ -37,11 +37,12 @@ export default function WorkerHome() {
   const alerts = unread.data?.length ?? 0;
 
   return (
-    <main className="flex flex-col gap-5 px-5 pt-3">
+    // lg: two columns (balance + actions | chart + tip). The `contents` wrappers vanish below lg, so the base flow is untouched.
+    <main className="flex flex-col gap-5 px-5 pt-3 lg:grid lg:grid-cols-2 lg:gap-x-4">
       <Backdrop variant="home" />
-      <header className="grid h-14 grid-cols-[88px_1fr_88px] items-center">
+      <header className="grid h-14 grid-cols-[88px_1fr_88px] items-center lg:col-span-2">
         <MenuButton />
-        <Logo className="h-7 justify-self-center" />
+        <Logo className="h-7 justify-self-center md:invisible" />
         <div className="flex items-center justify-end gap-2">
           <Link
             href="/app/finanzas?vista=alarma"
@@ -61,117 +62,121 @@ export default function WorkerHome() {
         </div>
       </header>
 
-      <section className="flex flex-col gap-1 pt-1">
+      <section className="flex flex-col gap-1 pt-1 lg:col-span-2">
         <h1 className="text-h1 text-ink">{firstName ? `¡Hola, ${firstName}!` : "¡Hola!"}</h1>
-        <p className="max-w-[28ch] text-[15px] font-medium text-balance text-ink-2">
+        <p className="max-w-[28ch] text-[15px] font-medium text-balance text-ink-2 md:max-w-none">
           {e?.period ? `Periodo ${e.period.label} · tu pago llega el ${dateFmt(e.period.payDate, { day: "numeric", month: "long" })}.` : "Tu bienestar financiero está en tus manos."}
         </p>
       </section>
 
-      {earnings.error ? (
-        <ErrorState error={earnings.error} onRetry={earnings.reload} title="No pudimos calcular tu saldo" />
-      ) : (
-        <Card aria-label="Saldo" className="overflow-hidden">
-          <Link href="/app/salario" className="group flex flex-col gap-4 bg-card-hero px-5 pt-5 pb-5 text-white">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-semibold text-white/80">Devengado neto a hoy</span>
-                {e ? <span className="text-display text-white tabular-nums">{money(e.netEarned)}</span> : <Skeleton className="h-9 w-44 bg-white/25" />}
+      <div className="contents lg:flex lg:flex-col lg:gap-5">
+        {earnings.error ? (
+          <ErrorState error={earnings.error} onRetry={earnings.reload} title="No pudimos calcular tu saldo" />
+        ) : (
+          <Card aria-label="Saldo" className="overflow-hidden">
+            <Link href="/app/salario" className="group flex flex-col gap-4 bg-card-hero px-5 pt-5 pb-5 text-white">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold text-white/80">Devengado neto a hoy</span>
+                  {e ? <span className="text-display text-white tabular-nums">{money(e.netEarned)}</span> : <Skeleton className="h-9 w-44 bg-white/25" />}
+                </div>
+                <span className="mt-1 flex items-center gap-0.5 text-xs font-bold text-white/85 transition-transform group-hover:translate-x-0.5">
+                  Detalle <ChevronRight className="size-3.5" />
+                </span>
               </div>
-              <span className="mt-1 flex items-center gap-0.5 text-xs font-bold text-white/85 transition-transform group-hover:translate-x-0.5">
-                Detalle <ChevronRight className="size-3.5" />
-              </span>
-            </div>
-            <div className="flex flex-col gap-2">
-              <div className="h-2 overflow-hidden rounded-full bg-white/20" role="img" aria-label={`Has usado el ${e?.usagePct ?? 0}% de tu tope del periodo`}>
-                <span className="block h-full rounded-full bg-linear-to-r from-[#c8f0c0] to-white transition-[width] duration-500" style={{ width: `${Math.min(e?.usagePct ?? 0, 100)}%` }} />
+              <div className="flex flex-col gap-2">
+                <div className="h-2 overflow-hidden rounded-full bg-white/20" role="img" aria-label={`Has usado el ${e?.usagePct ?? 0}% de tu tope del periodo`}>
+                  <span className="block h-full rounded-full bg-linear-to-r from-[#c8f0c0] to-white transition-[width] duration-500" style={{ width: `${Math.min(e?.usagePct ?? 0, 100)}%` }} />
+                </div>
+                <span className="text-[13px] font-semibold text-white/85">
+                  {e ? `Usado ${money(e.used)} · ${e.usagePct}% de tu tope de ${money(e.limits.limitAmount)}` : "Calculando..."}
+                </span>
               </div>
-              <span className="text-[13px] font-semibold text-white/85">
-                {e ? `Usado ${money(e.used)} · ${e.usagePct}% de tu tope de ${money(e.limits.limitAmount)}` : "Calculando..."}
+            </Link>
+            <Link href="/app/retirar" className="group flex items-center justify-between gap-3 bg-surface px-5 py-4 transition-colors hover:bg-green-50/60">
+              <span className="flex flex-col gap-0.5">
+                <span className="text-sm font-semibold text-ink-2">Disponible para retirar</span>
+                {e ? <span className="text-money text-green-600 tabular-nums">{money(e.available)}</span> : <Skeleton className="h-8 w-32" />}
+                {e && <span className="text-[13px] font-semibold text-ink-3">Recomendado: {money(e.recommended)}</span>}
               </span>
-            </div>
-          </Link>
-          <Link href="/app/retirar" className="group flex items-center justify-between gap-3 bg-surface px-5 py-4 transition-colors hover:bg-green-50/60">
-            <span className="flex flex-col gap-0.5">
-              <span className="text-sm font-semibold text-ink-2">Disponible para retirar</span>
-              {e ? <span className="text-money text-green-600 tabular-nums">{money(e.available)}</span> : <Skeleton className="h-8 w-32" />}
-              {e && <span className="text-[13px] font-semibold text-ink-3">Recomendado: {money(e.recommended)}</span>}
-            </span>
-            <IconBox tone="white" className="transition-transform duration-200 group-hover:translate-x-0.5">
-              <ChevronRight className="stroke-[2.5]" />
-            </IconBox>
-          </Link>
-        </Card>
-      )}
-
-      {e && e.blockers.length > 0 && (
-        <Notice tone="warning" title="Por ahora no puedes retirar">
-          {e.blockers.map((b) => (
-            <span key={b}>{b}</span>
-          ))}
-        </Notice>
-      )}
-
-      <section className="grid grid-cols-2 gap-3">
-        <Link
-          href="/app/retirar"
-          className="flex h-[118px] flex-col justify-between rounded-lg bg-tile-primary p-4 shadow-tile ring-1 ring-inset ring-white/40 transition-transform duration-150 active:scale-[0.98]"
-        >
-          <IconBox tone="dark" className="shadow-[0_6px_14px_-6px_rgb(20_61_34/0.6)]">
-            <ArrowUpRight className="stroke-[2.5]" />
-          </IconBox>
-          <span className="text-base font-bold text-green-900">Retirar</span>
-        </Link>
-        <Link href="/app/servicios" className="transition-transform duration-150 active:scale-[0.98]">
-          <Card tone="soft" className="flex h-[118px] flex-col items-center justify-center gap-2 p-4 text-center">
-            <IconBox>
-              <LayoutGrid />
-            </IconBox>
-            <span className="text-[15px] leading-tight font-bold text-ink">
-              Pagos y
-              <br />
-              recargas
-            </span>
+              <IconBox tone="white" className="transition-transform duration-200 group-hover:translate-x-0.5">
+                <ChevronRight className="stroke-[2.5]" />
+              </IconBox>
+            </Link>
           </Card>
-        </Link>
-      </section>
+        )}
 
-      {weekly.data && weekly.data.length > 0 && (
-        <Card tone="soft" className="flex flex-col gap-3 p-5">
-          <SectionTitle
-            action={
-              <Link href="/app/salario" className="text-sm font-bold text-green-700 underline-offset-4 hover:underline">
-                Cómo se calcula
-              </Link>
-            }
+        {e && e.blockers.length > 0 && (
+          <Notice tone="warning" title="Por ahora no puedes retirar">
+            {e.blockers.map((b) => (
+              <span key={b}>{b}</span>
+            ))}
+          </Notice>
+        )}
+
+        <section className="grid grid-cols-2 gap-3">
+          <Link
+            href="/app/retirar"
+            className="flex h-[118px] flex-col justify-between rounded-lg bg-tile-primary p-4 shadow-tile ring-1 ring-inset ring-white/40 transition-transform duration-150 active:scale-[0.98]"
           >
-            Así crece tu devengado
-          </SectionTitle>
-          <Bars data={weekly.data} x="week" height={160} highlightLast />
-          {e && (
-            <p className="text-xs font-semibold text-ink-3">
-              Datos de nómina actualizados el {dateFmt(e.dataUpdatedAt, { day: "numeric", month: "short" })} a las {timeFmt(e.dataUpdatedAt)}
-            </p>
-          )}
-        </Card>
-      )}
-
-      {tip && (
-        <Link href="/app/finanzas" className="group">
-          <Card tone="soft" className="flex items-center gap-3 p-4">
-            <IconBox tone="amber">
-              <Lightbulb />
+            <IconBox tone="dark" className="shadow-[0_6px_14px_-6px_rgb(20_61_34/0.6)]">
+              <ArrowUpRight className="stroke-[2.5]" />
             </IconBox>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-[15px] font-bold text-ink">Consejo del día</span>
-              <span className="text-sm font-medium text-ink-2">{tip}</span>
-            </span>
-            <ChevronRight aria-hidden className="size-5 shrink-0 text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5" />
-          </Card>
-        </Link>
-      )}
+            <span className="text-base font-bold text-green-900">Retirar</span>
+          </Link>
+          <Link href="/app/servicios" className="transition-transform duration-150 active:scale-[0.98]">
+            <Card tone="soft" className="flex h-[118px] flex-col items-center justify-center gap-2 p-4 text-center">
+              <IconBox>
+                <LayoutGrid />
+              </IconBox>
+              <span className="text-[15px] leading-tight font-bold text-ink">
+                Pagos y
+                <br />
+                recargas
+              </span>
+            </Card>
+          </Link>
+        </section>
+      </div>
 
-      <section className="flex flex-col gap-3 pt-1">
+      <div className="contents lg:flex lg:flex-col lg:gap-5">
+        {weekly.data && weekly.data.length > 0 && (
+          <Card tone="soft" className="flex flex-col gap-3 p-5">
+            <SectionTitle
+              action={
+                <Link href="/app/salario" className="text-sm font-bold text-green-700 underline-offset-4 hover:underline lg:whitespace-nowrap">
+                  Cómo se calcula
+                </Link>
+              }
+            >
+              Así crece tu devengado
+            </SectionTitle>
+            <Bars data={weekly.data} x="week" height={160} highlightLast />
+            {e && (
+              <p className="text-xs font-semibold text-ink-3">
+                Datos de nómina actualizados el {dateFmt(e.dataUpdatedAt, { day: "numeric", month: "short" })} a las {timeFmt(e.dataUpdatedAt)}
+              </p>
+            )}
+          </Card>
+        )}
+
+        {tip && (
+          <Link href="/app/finanzas" className="group">
+            <Card tone="soft" className="flex items-center gap-3 p-4">
+              <IconBox tone="amber">
+                <Lightbulb />
+              </IconBox>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-[15px] font-bold text-ink">Consejo del día</span>
+                <span className="text-sm font-medium text-ink-2">{tip}</span>
+              </span>
+              <ChevronRight aria-hidden className="size-5 shrink-0 text-ink-3 transition-transform duration-150 group-hover:translate-x-0.5" />
+            </Card>
+          </Link>
+        )}
+      </div>
+
+      <section className="flex flex-col gap-3 pt-1 lg:col-span-2">
         <SectionTitle
           action={
             <Link href="/app/movimientos" className="text-sm font-bold text-green-700 underline-offset-4 hover:underline">

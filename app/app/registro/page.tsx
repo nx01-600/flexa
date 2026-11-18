@@ -45,7 +45,7 @@ export default function Register() {
     <>
       <Backdrop variant="inner" />
       <TopBar title="Crear cuenta" back="/app/login" />
-      <main className="flex flex-col gap-6 px-5 pt-4 pb-10">
+      <main className="flex flex-col gap-6 px-5 pt-4 pb-10 md:mx-auto md:max-w-[600px]">
         <div className="flex flex-col gap-1">
           <h2 className="text-h2 text-ink">Activa tu acceso a FLEXA</h2>
           <p className="text-[15px] font-medium text-ink-2">Usa la cédula y el correo que tu empresa registró. Si no te reconocemos, habla con Talento Humano.</p>

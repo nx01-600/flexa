@@ -57,7 +57,7 @@ export default function UploadDetail() {
         {actionError && <Notice tone="red">{actionError}</Notice>}
         {visible.length ? (
           <Table>
-            <thead><tr><Th>Fila</Th><Th>Documento</Th><Th>Campo</Th><Th>Detalle</Th><Th>Tipo</Th><Th className="text-right"><span className="sr-only">Acciones</span></Th></tr></thead>
+            <thead><tr><Th>Fila</Th><Th>Documento</Th><Th>Campo</Th><Th>Detalle</Th><Th>Tipo</Th><Th className="relative text-right"><span className="sr-only">Acciones</span></Th></tr></thead>
             <tbody>
               {visible.map((i) => (
                 <tr key={i.id} className={cn(i.resolved && "opacity-60")}>

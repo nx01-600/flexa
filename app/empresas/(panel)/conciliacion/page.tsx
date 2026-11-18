@@ -34,8 +34,8 @@ export default function Reconciliation() {
           ) : (
             <ul className="flex flex-col gap-2.5">
               {data.byPeriod.map((p) => (
-                <li key={p.periodId} className="flex items-center gap-4 rounded-md bg-[#f6faf5] p-3.5">
-                  <span className="flex flex-1 flex-col">
+                <li key={p.periodId} className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-md bg-[#f6faf5] p-3.5 lg:flex-nowrap">
+                  <span className="flex min-w-48 flex-1 flex-col lg:min-w-0">
                     <span className="flex items-center gap-2 text-[15px] font-bold text-ink">{p.label} <PeriodBadge value={p.status} /></span>
                     <span className="text-[13px] font-medium text-ink-2 tabular-nums">{p.advances} anticipos · {money(p.toCompensate)}</span>
                   </span>

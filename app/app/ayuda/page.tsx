@@ -171,7 +171,7 @@ function NewTicket({ open, onOpenChange, onCreated }: { open: boolean; onOpenCha
 
   return (
     <Sheet open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <SheetContent side="bottom" showCloseButton={false} className="mx-auto max-h-[92dvh] max-w-[430px] gap-0 overflow-y-auto rounded-t-2xl border-0 bg-page p-0">
+      <SheetContent side="bottom" showCloseButton={false} className="mx-auto max-h-[92dvh] max-w-[430px] gap-0 overflow-y-auto rounded-t-2xl border-0 bg-page p-0 md:data-[side=bottom]:bottom-6 md:max-h-[calc(100dvh-3rem)] md:max-w-[520px] md:rounded-2xl">
         <form onSubmit={submit} className="flex flex-col gap-4 px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))]">
           <div className="flex items-start gap-3">
             <div className="flex flex-1 flex-col gap-0.5">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, IdCard, LockKeyhole, UserRound } from "@/components/flexa/icons";
 import { useState } from "react";
 import { login, type Surface } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { Button, Field, Input } from "@/components/flexa/ui";
 
 // Signs in against the FLEXA API. Labels stay for screen readers; the visible cue
@@ -16,6 +17,7 @@ export function LoginForm({
   to,
   surface,
   size = "lg",
+  smallPlaceholder,
 }: {
   userLabel: string;
   userPlaceholder: string;
@@ -23,6 +25,8 @@ export function LoginForm({
   to: string;
   surface: Surface;
   size?: "lg" | "xl";
+  // Shrinks the user placeholder on phones when its copy is too long for the field.
+  smallPlaceholder?: boolean;
 }) {
   const router = useRouter();
   const [show, setShow] = useState(false);
@@ -55,7 +59,7 @@ export function LoginForm({
           inputMode={numeric ? "numeric" : "email"}
           autoComplete="username"
           placeholder={userPlaceholder}
-          className={h}
+          className={cn(h, smallPlaceholder && "max-sm:placeholder:text-sm")}
         />
       </Field>
       <Field label="Contraseña" htmlFor="password" hideLabel>

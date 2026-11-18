@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Banknote, Clock, Download, FileText, Flame, Scale, TrendingUp } from "@/components/flexa/empresas/icons";
 import { PageHeader } from "@/components/flexa/company-shell";
 import { GroupBars, Legend } from "@/components/flexa/empresas/charts";
@@ -26,6 +26,15 @@ function Stats() {
   const [periodId, setPeriodId] = useQueryState("periodo");
   const periods = useApi<Period[]>("/payroll/periods");
   const withPeriod = tab === "nomina" || tab === "variaciones" || tab === "reportes";
+  const tabsBox = useRef<HTMLDivElement>(null);
+  // Keep the active tab visible when the track scrolls on narrow screens.
+  useEffect(() => {
+    const box = tabsBox.current;
+    const on = box?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!box || !on) return;
+    const offset = on.getBoundingClientRect().left - box.getBoundingClientRect().left;
+    box.scrollTo({ left: box.scrollLeft + offset - (box.clientWidth - on.offsetWidth) / 2 });
+  }, [tab]);
   return (
     <>
       <PageHeader
@@ -34,11 +43,14 @@ function Stats() {
         action={
           withPeriod &&
           periods.data && (
-            <Select aria-label="Periodo" value={periodId} onChange={(e) => setPeriodId(e.target.value)} options={periods.data.map((p) => ({ value: p.id, label: p.label }))} placeholder="Periodo actual" className="w-52" />
+            <Select aria-label="Periodo" value={periodId} onChange={(e) => setPeriodId(e.target.value)} options={periods.data.map((p) => ({ value: p.id, label: p.label }))} placeholder="Periodo actual" className="w-full sm:w-52" />
           )
         }
       />
-      <PillTabs variant="segmented" options={tabs} value={tab as (typeof tabs)[number]["value"]} onChange={setTab} />
+      {/* Five tabs do not fit below sm: the track keeps its natural width and scrolls inside this box. */}
+      <div ref={tabsBox} className="overflow-x-auto [scrollbar-width:none]">
+        <PillTabs variant="segmented" className="min-w-max" options={tabs} value={tab as (typeof tabs)[number]["value"]} onChange={setTab} />
+      </div>
       {tab === "nomina" && <PayrollTab periodId={periodId} />}
       {tab === "variaciones" && <VariationsTab periodId={periodId} />}
       {tab === "tendencias" && <TrendsTab />}
@@ -86,7 +98,7 @@ function PayrollTab({ periodId }: { periodId: string }) {
   const b = d.budget;
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={Banknote} value={money(d.accumulated)} label={`Acumulado a hoy · día ${d.progress.elapsedDays} de ${d.progress.periodDays}`} />
         <Kpi icon={TrendingUp} value={money(d.projected)} label="Nómina proyectada al cierre" tone="teal" />
         <Kpi icon={Clock} value={money(d.overtime.amount)} label={`Horas extra · ${d.overtime.hours} h · ${pct(d.overtime.shareOfPayrollPct)}`} tone="amber" />
@@ -102,7 +114,7 @@ function PayrollTab({ periodId }: { periodId: string }) {
                 <Meter label="Ejecutado" value={b.executed} max={b.budget} tone="green" />
                 <Meter label="Proyectado" value={b.projected} max={b.budget} tone={b.projected > b.budget ? "amber" : "teal"} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Box label="Presupuesto" value={money(b.budget)} />
                 <Box label="Desviación proyectada" value={<span className={cn((b.projectedDeviation ?? 0) > 0 ? "text-warning" : "text-green-700")}>{money(b.projectedDeviation)} <span className="text-sm">({pct(b.projectedDeviationPct)})</span></span>} />
               </div>
@@ -112,7 +124,8 @@ function PayrollTab({ periodId }: { periodId: string }) {
           )}
         </SectionCard>
 
-        <SectionCard>
+        {/* Single column below xl: let the table scroll inside the card instead of widening the grid track (14px page overflow at 1024). */}
+        <SectionCard className="lg:min-w-0 xl:min-w-auto">
           <CardHead title="Por sede" sub="Proyectado, horas extra y recargos" />
           <Table>
             <thead><tr><Th>Sede</Th><Th className="text-right">Trabajadores</Th><Th className="text-right">Proyectado</Th><Th className="text-right">Horas extra</Th><Th className="text-right">Valor h. extra</Th><Th className="text-right">Recargos</Th></tr></thead>
@@ -210,11 +223,11 @@ function VariationsTab({ periodId }: { periodId: string }) {
         action={<Delta value={d.totals.changePct} goodWhenUp={false} />}
       />
       <div className="flex flex-wrap items-end gap-3">
-        <FormField label="Umbral de cambio (%)" className="w-44"><TextInput type="number" min={1} max={500} value={threshold} onChange={(e) => setThreshold(e.target.value)} /></FormField>
-        <FormField label="Concepto" className="w-52">
+        <FormField label="Umbral de cambio (%)" className="w-full sm:w-44"><TextInput type="number" min={1} max={500} value={threshold} onChange={(e) => setThreshold(e.target.value)} /></FormField>
+        <FormField label="Concepto" className="w-full sm:w-52">
           <Select value={concept} onChange={(e) => setConcept(e.target.value)} options={concepts.map((c) => ({ value: c, label: c }))} placeholder="Todos" />
         </FormField>
-        <span className="mb-3 ml-auto text-sm font-semibold text-ink-2 tabular-nums">{items.length} variaciones</span>
+        <span className="ml-auto text-sm font-semibold text-ink-2 tabular-nums sm:mb-3">{items.length} variaciones</span>
       </div>
       {items.length ? (
         <Table>
@@ -322,8 +335,8 @@ function CompareTab({ periods }: { periods: Period[] }) {
   return (
     <SectionCard>
       <div className="flex flex-wrap items-end gap-3">
-        <FormField label="Periodo A" className="w-52"><Select value={pa} onChange={(e) => setA(e.target.value)} options={options} /></FormField>
-        <FormField label="Periodo B" className="w-52"><Select value={pb} onChange={(e) => setB(e.target.value)} options={options} /></FormField>
+        <FormField label="Periodo A" className="w-full sm:w-52"><Select value={pa} onChange={(e) => setA(e.target.value)} options={options} /></FormField>
+        <FormField label="Periodo B" className="w-full sm:w-52"><Select value={pb} onChange={(e) => setB(e.target.value)} options={options} /></FormField>
       </div>
       {periods.length < 2 ? (
         <EmptyState title="Necesitas al menos dos periodos" />
@@ -337,6 +350,7 @@ function CompareTab({ periods }: { periods: Period[] }) {
         <>
           <GroupBars
             height={240}
+            minGroup={120}
             data={compareRows.filter(([k]) => ["overtimeAmount", "surcharges", "deductions", "withdrawn"].includes(k)).map(([k, label]) => ({ name: label, a: d.a[k], b: d.b[k] }))}
             x="name"
             series={[
@@ -385,9 +399,9 @@ function ReportsTab({ periodId }: { periodId: string }) {
       {error && <Notice tone="red" onClose={() => setError(null)}>{error}</Notice>}
       <div className="grid gap-4 md:grid-cols-2">
         {reports.map((r) => (
-          <Card key={r.type} className="flex items-center gap-4 p-5">
+          <Card key={r.type} className="flex flex-wrap items-center gap-4 p-5 lg:flex-nowrap">
             <IconBox tone="green" size="lg"><FileText /></IconBox>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="flex min-w-48 flex-1 flex-col gap-0.5 lg:min-w-0">
               <span className="text-[15px] font-bold text-ink">{r.title}</span>
               <span className="text-[13px] font-medium text-ink-2">{r.text}</span>
             </div>

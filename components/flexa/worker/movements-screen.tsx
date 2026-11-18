@@ -65,6 +65,7 @@ export function MovementsScreen() {
       <Backdrop variant="inner" />
       <TopBar
         title="Movimientos"
+        tab
         action={
           <button
             type="button"
@@ -99,63 +100,66 @@ function MovementList() {
     <>
       <PillTabs options={filters} value={filter} onChange={setFilter} full />
 
-      {all.data && (
-        <section aria-label="Resumen del historial" className="grid grid-cols-2 gap-3">
-          <Card tone="red" className="flex items-center gap-3 p-4">
-            <IconBox tone="red" size="sm">
-              <ArrowUpRight className="stroke-[2.5]" />
-            </IconBox>
-            <span className="flex min-w-0 flex-col">
-              <span className="text-[13px] font-semibold text-ink-2">Retiros</span>
-              <span className="text-[17px] font-extrabold tracking-[-0.02em] text-ink tabular-nums">{money(withdrawn)}</span>
-            </span>
-          </Card>
-          <Card tone="green" className="flex items-center gap-3 p-4">
-            <IconBox size="sm">
-              <Receipt />
-            </IconBox>
-            <span className="flex min-w-0 flex-col">
-              <span className="text-[13px] font-semibold text-ink-2">Pagos y recargas</span>
-              <span className="text-[17px] font-extrabold tracking-[-0.02em] text-ink tabular-nums">{money(paid)}</span>
-            </span>
-          </Card>
-        </section>
-      )}
+      {/* lg: totals as a left column next to the list; `contents` keeps the base flow below lg. */}
+      <div className={cn("contents", all.data && "lg:grid lg:grid-cols-[232px_minmax(0,1fr)] lg:items-start lg:gap-4")}>
+        {all.data && (
+          <section aria-label="Resumen del historial" className="grid grid-cols-2 gap-3 lg:sticky lg:top-4 lg:grid-cols-1">
+            <Card tone="red" className="flex items-center gap-3 p-4">
+              <IconBox tone="red" size="sm">
+                <ArrowUpRight className="stroke-[2.5]" />
+              </IconBox>
+              <span className="flex min-w-0 flex-col">
+                <span className="text-[13px] font-semibold text-ink-2">Retiros</span>
+                <span className="text-[17px] font-extrabold tracking-[-0.02em] text-ink tabular-nums">{money(withdrawn)}</span>
+              </span>
+            </Card>
+            <Card tone="green" className="flex items-center gap-3 p-4">
+              <IconBox size="sm">
+                <Receipt />
+              </IconBox>
+              <span className="flex min-w-0 flex-col">
+                <span className="text-[13px] font-semibold text-ink-2">Pagos y recargas</span>
+                <span className="text-[17px] font-extrabold tracking-[-0.02em] text-ink tabular-nums">{money(paid)}</span>
+              </span>
+            </Card>
+          </section>
+        )}
 
-      {loading && !data ? (
-        <LoadingRows count={5} />
-      ) : error ? (
-        <ErrorState error={error} onRetry={reload} />
-      ) : !data?.length ? (
-        <EmptyState
-          icon={Receipt}
-          title={filter === "todos" ? "Aún no tienes movimientos" : "Nada por aquí"}
-          text={filter === "todos" ? "Tus retiros, pagos y recargas aparecerán aquí." : "No tienes movimientos de este tipo."}
-        />
-      ) : (
-        <div className={cn("flex flex-col gap-4 transition-opacity", loading && "opacity-60")}>
-          <AnimatePresence initial={false} mode="popLayout">
-            {groupByMonth(data).map(([month, rows]) => (
-              <motion.section
-                key={month}
-                layout={!reduce}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: reduce ? 0 : 0.2 }}
-                className="flex flex-col gap-2"
-              >
-                <h2 className="px-1 text-sm font-bold text-ink-2">{month}</h2>
-                <Card tone="soft" className="overflow-hidden">
-                  {rows.map((m, i) => (
-                    <MovementRow key={m.id} m={m} divider={i > 0} />
-                  ))}
-                </Card>
-              </motion.section>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
+        {loading && !data ? (
+          <LoadingRows count={5} />
+        ) : error ? (
+          <ErrorState error={error} onRetry={reload} />
+        ) : !data?.length ? (
+          <EmptyState
+            icon={Receipt}
+            title={filter === "todos" ? "Aún no tienes movimientos" : "Nada por aquí"}
+            text={filter === "todos" ? "Tus retiros, pagos y recargas aparecerán aquí." : "No tienes movimientos de este tipo."}
+          />
+        ) : (
+          <div className={cn("flex flex-col gap-4 transition-opacity", loading && "opacity-60")}>
+            <AnimatePresence initial={false} mode="popLayout">
+              {groupByMonth(data).map(([month, rows]) => (
+                <motion.section
+                  key={month}
+                  layout={!reduce}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: reduce ? 0 : 0.2 }}
+                  className="flex flex-col gap-2"
+                >
+                  <h2 className="px-1 text-sm font-bold text-ink-2">{month}</h2>
+                  <Card tone="soft" className="overflow-hidden">
+                    {rows.map((m, i) => (
+                      <MovementRow key={m.id} m={m} divider={i > 0} />
+                    ))}
+                  </Card>
+                </motion.section>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
     </>
   );
 }

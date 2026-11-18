@@ -23,7 +23,7 @@ export default function Support() {
       <PageHeader title="Soporte" sub="Solicitudes de tu empresa y de tus trabajadores al equipo de Flexa." action={<Button size="md" onClick={() => setOpen(true)}><Plus />Nueva solicitud</Button>} />
       <SectionCard>
         <div className="flex justify-end">
-          <Select aria-label="Estado" value={status} onChange={(e) => setStatus(e.target.value)} options={Object.entries(ticketStatus).map(([value, [label]]) => ({ value, label }))} placeholder="Todos los estados" className="w-56" />
+          <Select aria-label="Estado" value={status} onChange={(e) => setStatus(e.target.value)} options={Object.entries(ticketStatus).map(([value, [label]]) => ({ value, label }))} placeholder="Todos los estados" className="w-full sm:w-56" />
         </div>
         {error ? (
           <ErrorState error={error} onRetry={reload} />

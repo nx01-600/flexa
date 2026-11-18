@@ -82,7 +82,7 @@ export default function Workers() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={Users} value={all.data ? totals.filter((w) => w.status !== "RETIRED").length : "—"} label="Trabajadores en nómina" />
         <Kpi icon={UserCheck} value={all.data ? totals.filter((w) => w.enabled).length : "—"} label="Habilitados en Flexa" tone="teal" />
         <Kpi icon={UserX} value={all.data ? totals.filter((w) => !w.enabled && w.status !== "RETIRED").length : "—"} label="Sin acceso" tone="green" />
@@ -91,17 +91,17 @@ export default function Workers() {
 
       {msg && <Notice onClose={() => setMsg(null)}>{msg}</Notice>}
 
-      <Card className="flex flex-col gap-4 p-6">
+      <Card className="flex flex-col gap-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center gap-3">
           <SearchBox value={q} onChange={(v) => (setQ(v), setPage(0))} placeholder="Buscar por nombre, cédula o correo" />
-          <Select aria-label="Sede" value={siteId} onChange={(e) => (setSiteId(e.target.value), setPage(0))} options={(sites.data ?? []).map((s) => ({ value: s.id, label: s.name }))} placeholder="Todas las sedes" className="w-52" />
-          <Select aria-label="Estado" value={status} onChange={(e) => (setStatus(e.target.value), setPage(0))} options={Object.entries(workerStatus).map(([value, [label]]) => ({ value, label }))} placeholder="Todos los estados" className="w-52" />
-          <PillTabs options={access} value={enabled} onChange={(v) => (setEnabled(v), setPage(0))} className="[&>button]:h-11 [&>button]:px-5" />
+          <Select aria-label="Sede" value={siteId} onChange={(e) => (setSiteId(e.target.value), setPage(0))} options={(sites.data ?? []).map((s) => ({ value: s.id, label: s.name }))} placeholder="Todas las sedes" className="w-full sm:w-52" />
+          <Select aria-label="Estado" value={status} onChange={(e) => (setStatus(e.target.value), setPage(0))} options={Object.entries(workerStatus).map(([value, [label]]) => ({ value, label }))} placeholder="Todos los estados" className="w-full sm:w-52" />
+          <PillTabs options={access} value={enabled} onChange={(v) => (setEnabled(v), setPage(0))} className="[&>button]:h-11 [&>button]:px-5 max-sm:[&>button]:px-4" />
         </div>
 
         {canWrite && selected.size > 0 && (
-          <div className="flex items-center gap-3 rounded-md bg-green-100 px-4 py-2.5">
-            <span className="flex-1 text-sm font-bold text-green-900 tabular-nums">{selected.size} seleccionados</span>
+          <div className="flex items-center gap-3 rounded-md bg-green-100 px-4 py-2.5 max-sm:flex-wrap">
+            <span className="flex-1 text-sm font-bold text-green-900 tabular-nums max-sm:basis-full">{selected.size} seleccionados</span>
             <Button variant="soft" size="sm" className="bg-white" onClick={() => setBulk(true)}>Habilitar</Button>
             <Button variant="danger-outline" size="sm" onClick={() => setBulk(false)}>Deshabilitar</Button>
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Limpiar</Button>
@@ -179,7 +179,7 @@ export default function Workers() {
           </Table>
         )}
 
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center justify-between pt-1 max-sm:flex-wrap max-sm:gap-y-3">
           <span className="text-sm font-semibold text-ink-2 tabular-nums">
             {list.length ? `Mostrando ${current * PAGE + 1}–${Math.min((current + 1) * PAGE, list.length)} de ${list.length}` : "Sin resultados"}
           </span>

@@ -30,7 +30,7 @@ export function FinancesScreen() {
   return (
     <>
       <Backdrop variant="inner" wash />
-      <TopBar title="Mis finanzas" />
+      <TopBar title="Mis finanzas" tab />
       <main className="flex flex-col gap-4 px-5 pt-2">
         <PillTabs variant="segmented" options={views} value={view} onChange={(v) => router.replace(v === "resumen" ? path : `${path}?vista=${v}`, { scroll: false })} />
         {view === "resumen" ? <Summary /> : <Alarm state={alerts} />}
@@ -47,77 +47,82 @@ function Summary() {
   const near = w.usagePct >= w.alarmThresholds.usagePct;
   const periods = w.byPeriod.map((p) => ({ period: p.period.replace(/ \d{4}$/, ""), value: p.total }));
 
+  // lg: two columns (status, tiles, next pay | chart, tips); the `contents` wrappers vanish below lg.
   return (
-    <>
-      <Card tone={w.overRecommended ? "amber" : "mint"} className="relative isolate flex items-center gap-5 overflow-hidden p-5">
-        <Blob shape={1} tone="deep" className="-top-10 -right-12 -z-10 size-40 opacity-60" />
-        <Donut size={116} thickness={18} data={[{ name: "Usado", value: w.used }, { name: "Recomendado restante", value: Math.max(w.recommended, 0.0001) }]}>
-          <span className="flex flex-col items-center">
-            <span className="text-xl leading-none font-extrabold text-ink tabular-nums">{w.usagePct}%</span>
-            <span className="mt-1 text-[11px] font-semibold text-ink-3">de tu tope</span>
-          </span>
-        </Donut>
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-green-900">
-            <HeartPulse className="size-4" weight="fill" />
-            Recomendado vs. usado
-          </span>
-          <span className="text-h2 text-ink">{w.overRecommended ? "Por encima" : near ? "Con cuidado" : "Vas bien"}</span>
-          <span className="text-[13px] font-medium text-ink-2">
-            Usaste {money(w.used)}. {w.recommended > 0 ? `Aún puedes usar ${money(w.recommended)} dentro de lo recomendado.` : "Ya alcanzaste lo recomendado este periodo."}
-          </span>
-        </div>
-      </Card>
+    <div className="contents lg:grid lg:grid-cols-2 lg:items-start lg:gap-4">
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
+        <Card tone={w.overRecommended ? "amber" : "mint"} className="relative isolate flex items-center gap-5 overflow-hidden p-5">
+          <Blob shape={1} tone="deep" className="-top-10 -right-12 -z-10 size-40 opacity-60" />
+          <Donut size={116} thickness={18} data={[{ name: "Usado", value: w.used }, { name: "Recomendado restante", value: Math.max(w.recommended, 0.0001) }]}>
+            <span className="flex flex-col items-center">
+              <span className="text-xl leading-none font-extrabold text-ink tabular-nums">{w.usagePct}%</span>
+              <span className="mt-1 text-[11px] font-semibold text-ink-3">de tu tope</span>
+            </span>
+          </Donut>
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-green-900">
+              <HeartPulse className="size-4" weight="fill" />
+              Recomendado vs. usado
+            </span>
+            <span className="text-h2 text-ink">{w.overRecommended ? "Por encima" : near ? "Con cuidado" : "Vas bien"}</span>
+            <span className="text-[13px] font-medium text-ink-2">
+              Usaste {money(w.used)}. {w.recommended > 0 ? `Aún puedes usar ${money(w.recommended)} dentro de lo recomendado.` : "Ya alcanzaste lo recomendado este periodo."}
+            </span>
+          </div>
+        </Card>
 
-      <div className="grid grid-cols-2 gap-3">
-        <StatTile icon={PiggyBank} tone="green" label="Recomendado" value={money(w.recommended)} hint={`${ratio}% ya usado`} />
-        <StatTile icon={CircleDollarSign} tone="teal" label="Disponible" value={money(w.available)} />
+        <div className="grid grid-cols-2 gap-3">
+          <StatTile icon={PiggyBank} tone="green" label="Recomendado" value={money(w.recommended)} hint={`${ratio}% ya usado`} />
+          <StatTile icon={CircleDollarSign} tone="teal" label="Disponible" value={money(w.available)} />
+        </div>
+
+        <Card tone="soft" className="flex flex-col gap-3 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="text-h3 text-ink">Tu próximo pago</h2>
+              <span className="text-sm font-medium text-ink-2">Estimado después de tus retiros</span>
+            </div>
+            <IconBox tone="teal" size="sm">
+              <CalendarClock />
+            </IconBox>
+          </div>
+          <span className="text-display text-ink tabular-nums">{money(w.nextPayAfterUsage)}</span>
+          <div className="flex flex-col gap-1.5">
+            <div className="h-2 overflow-hidden rounded-full bg-green-100" role="img" aria-label={`Recibirás ${money(w.nextPayAfterUsage)} de ${money(w.projectedNet)}`}>
+              <span className="block h-full rounded-full bg-linear-to-r from-green-400 to-green-600" style={{ width: `${w.projectedNet ? (w.nextPayAfterUsage / w.projectedNet) * 100 : 0}%` }} />
+            </div>
+            <span className="text-[13px] font-semibold text-ink-3">
+              De un neto proyectado de {money(w.projectedNet)} se descuentan {money(w.used)}.
+            </span>
+          </div>
+        </Card>
       </div>
 
-      <Card tone="soft" className="flex flex-col gap-3 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="text-h3 text-ink">Tu próximo pago</h2>
-            <span className="text-sm font-medium text-ink-2">Estimado después de tus retiros</span>
-          </div>
-          <IconBox tone="teal" size="sm">
-            <CalendarClock />
-          </IconBox>
-        </div>
-        <span className="text-display text-ink tabular-nums">{money(w.nextPayAfterUsage)}</span>
-        <div className="flex flex-col gap-1.5">
-          <div className="h-2 overflow-hidden rounded-full bg-green-100" role="img" aria-label={`Recibirás ${money(w.nextPayAfterUsage)} de ${money(w.projectedNet)}`}>
-            <span className="block h-full rounded-full bg-linear-to-r from-green-400 to-green-600" style={{ width: `${w.projectedNet ? (w.nextPayAfterUsage / w.projectedNet) * 100 : 0}%` }} />
-          </div>
-          <span className="text-[13px] font-semibold text-ink-3">
-            De un neto proyectado de {money(w.projectedNet)} se descuentan {money(w.used)}.
-          </span>
-        </div>
-      </Card>
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
+        <Card tone="soft" className="flex flex-col gap-3 p-5">
+          <h2 className="text-h3 text-ink">Uso por periodo</h2>
+          {periods.length ? <Bars data={periods} x="period" height={180} highlightLast /> : <p className="text-sm font-medium text-ink-2">Aún no hay periodos con retiros.</p>}
+          <p className="text-xs font-semibold text-ink-3">Incluye retiros, pagos de servicios y recargas.</p>
+        </Card>
 
-      <Card tone="soft" className="flex flex-col gap-3 p-5">
-        <h2 className="text-h3 text-ink">Uso por periodo</h2>
-        {periods.length ? <Bars data={periods} x="period" height={180} highlightLast /> : <p className="text-sm font-medium text-ink-2">Aún no hay periodos con retiros.</p>}
-        <p className="text-xs font-semibold text-ink-3">Incluye retiros, pagos de servicios y recargas.</p>
-      </Card>
-
-      {w.tips.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-h3 text-ink">Consejos para ti</h2>
-          {w.tips.map((t) => (
-            <Card key={t} tone="soft" className="flex items-start gap-3 p-4">
-              <IconBox tone="amber" size="sm">
-                <Lightbulb />
-              </IconBox>
-              <p className="pt-1.5 text-sm font-medium text-ink">{t}</p>
-            </Card>
-          ))}
-        </section>
-      )}
-      <p className="px-1 pb-2 text-[13px] font-medium text-ink-3">
+        {w.tips.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h2 className="text-h3 text-ink">Consejos para ti</h2>
+            {w.tips.map((t) => (
+              <Card key={t} tone="soft" className="flex items-start gap-3 p-4">
+                <IconBox tone="amber" size="sm">
+                  <Lightbulb />
+                </IconBox>
+                <p className="pt-1.5 text-sm font-medium text-ink">{t}</p>
+              </Card>
+            ))}
+          </section>
+        )}
+      </div>
+      <p className="px-1 pb-2 text-[13px] font-medium text-ink-3 lg:col-span-2">
         La Alarma FLEXA te avisa al pasar el {w.alarmThresholds.usagePct}% de tu tope o al llegar a {w.alarmThresholds.requests} retiros en el periodo. Nunca bloquea tus retiros.
       </p>
-    </>
+    </div>
   );
 }
 

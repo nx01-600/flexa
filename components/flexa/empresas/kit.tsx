@@ -80,8 +80,8 @@ export function Loading({ rows = 3, className }: { rows?: number; className?: st
 export function PageLoading() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="h-16 w-80 animate-pulse rounded-md bg-mint-1 motion-reduce:animate-none" />
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="h-16 w-full max-w-80 animate-pulse rounded-md bg-mint-1 motion-reduce:animate-none" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="h-36 animate-pulse rounded-lg bg-mint-1 motion-reduce:animate-none" />
         ))}
@@ -95,9 +95,9 @@ export function ErrorState({ error, onRetry, className }: { error: ApiError | Er
   if (!error) return null;
   const offline = error instanceof ApiError && error.status === 0;
   return (
-    <div role="alert" className={cn("flex items-center gap-4 rounded-md bg-danger-soft/60 p-4", className)}>
+    <div role="alert" className={cn("flex flex-wrap items-center gap-4 rounded-md bg-danger-soft/60 p-4 lg:flex-nowrap", className)}>
       <IconBox tone="red" size="sm"><TriangleAlert /></IconBox>
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-48 flex-1 flex-col lg:min-w-auto">
         <span className="text-[15px] font-bold text-ink">{offline ? "No pudimos conectar con Flexa" : "No pudimos cargar esta información"}</span>
         <span className="text-[13px] font-medium text-ink-2">{offline ? "Revisa tu conexión e intenta de nuevo." : error.message}</span>
       </div>
@@ -197,7 +197,7 @@ export function Select({ className, options, placeholder, ...props }: ComponentP
 
 export function SearchBox({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder: string; className?: string }) {
   return (
-    <label className={cn("relative min-w-64 flex-1", className)}>
+    <label className={cn("relative min-w-[min(16rem,100%)] flex-1", className)}>
       <span className="sr-only">{placeholder}</span>
       <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-ink-3" />
       <input
@@ -272,7 +272,7 @@ export function Dialog({
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
       className={cn(
-        "m-auto w-[calc(100%-32px)] rounded-xl bg-surface p-0 text-ink shadow-raised backdrop:bg-green-900/30 backdrop:backdrop-blur-[2px] open:animate-in open:fade-in-0 open:zoom-in-95 motion-reduce:open:animate-none",
+        "m-auto max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] overflow-y-auto rounded-xl bg-surface p-0 text-ink shadow-raised backdrop:bg-green-900/30 backdrop:backdrop-blur-[2px] open:animate-in open:fade-in-0 open:zoom-in-95 motion-reduce:open:animate-none",
         wide ? "max-w-2xl" : "max-w-lg",
       )}
     >
@@ -283,10 +283,10 @@ export function Dialog({
           e.preventDefault();
           onSubmit(e);
         }}
-        className="flex flex-col gap-5 p-6"
+        className="flex flex-col gap-5 p-5 sm:p-6"
       >
         <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-1">
+          <div className="flex min-w-0 flex-col gap-1">
             <h2 className="text-h2 text-ink">{title}</h2>
             {sub && <p className="text-sm font-medium text-ink-2">{sub}</p>}
           </div>
@@ -295,7 +295,7 @@ export function Dialog({
           </button>
         </div>
         {children}
-        {footer && <div className="flex justify-end gap-3 pt-1">{footer}</div>}
+        {footer && <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">{footer}</div>}
       </form>
     </dialog>
   );
@@ -472,17 +472,18 @@ export const contractTypes = ["INDEFINIDO", "FIJO", "OBRA_LABOR", "APRENDIZAJE"]
 // ---------- Small layout pieces ----------
 
 export function SectionCard({ children, className }: { children: ReactNode; className?: string }) {
-  return <Card className={cn("flex flex-col gap-4 p-6", className)}>{children}</Card>;
+  return <Card className={cn("flex min-w-0 flex-col gap-4 p-4 sm:p-6 lg:min-w-auto", className)}>{children}</Card>;
 }
 
 // Label / value list used on detail pages.
 export function Facts({ items, cols = 2 }: { items: [string, ReactNode][]; cols?: 2 | 3 | 4 }) {
   return (
-    <dl className={cn("grid gap-x-6 gap-y-4", cols === 2 ? "grid-cols-2" : cols === 3 ? "grid-cols-3" : "grid-cols-2 xl:grid-cols-4")}>
+    <dl className={cn("grid gap-x-4 gap-y-4 sm:gap-x-6", cols === 2 ? "grid-cols-2" : cols === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 xl:grid-cols-4")}>
       {items.map(([k, v]) => (
         <div key={k} className="flex min-w-0 flex-col gap-0.5">
           <dt className="text-[13px] font-semibold text-ink-3">{k}</dt>
-          <dd className="truncate text-[15px] font-bold text-ink tabular-nums">{v}</dd>
+          {/* Wraps on small screens so values stay readable; truncates from lg. */}
+          <dd className="text-[15px] font-bold break-words text-ink tabular-nums lg:truncate">{v}</dd>
         </div>
       ))}
     </dl>

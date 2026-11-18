@@ -48,16 +48,16 @@ export function AdvancesTab({
   return (
     <SectionCard>
       <div className="flex flex-wrap items-end gap-3">
-        <FormField label="Estado" className="w-48">
+        <FormField label="Estado" className="w-full sm:w-48">
           <Select value={filters.status} onChange={(e) => setFilter("status", e.target.value)} options={Object.entries(advanceStatus).map(([value, [label]]) => ({ value, label }))} placeholder="Todos" />
         </FormField>
-        <FormField label="Periodo" className="w-44">
+        <FormField label="Periodo" className="w-full sm:w-44">
           <Select value={filters.periodId} onChange={(e) => setFilter("periodId", e.target.value)} options={(periods.data ?? []).map((p) => ({ value: p.id, label: p.label }))} placeholder="Todos" />
         </FormField>
-        <FormField label="Desde" className="w-44"><TextInput type="date" value={filters.from} onChange={(e) => setFilter("from", e.target.value)} /></FormField>
-        <FormField label="Hasta" className="w-44"><TextInput type="date" value={filters.to} onChange={(e) => setFilter("to", e.target.value)} /></FormField>
+        <FormField label="Desde" className="w-full sm:w-44"><TextInput type="date" value={filters.from} onChange={(e) => setFilter("from", e.target.value)} /></FormField>
+        <FormField label="Hasta" className="w-full sm:w-44"><TextInput type="date" value={filters.to} onChange={(e) => setFilter("to", e.target.value)} /></FormField>
         {filters.workerId && <Button variant="soft" size="sm" className="mb-0.5 h-11" onClick={() => setFilter("workerId", "")}>Quitar filtro de trabajador</Button>}
-        <span className="mb-3 ml-auto text-sm font-semibold text-ink-2 tabular-nums">{data ? `${data.length} solicitudes · ${money(total)} desembolsado` : ""}</span>
+        <span className="mb-3 ml-auto text-sm max-sm:ml-0 font-semibold text-ink-2 tabular-nums">{data ? `${data.length} solicitudes · ${money(total)} desembolsado` : ""}</span>
       </div>
       {error ? (
         <ErrorState error={error} onRetry={reload} />
@@ -104,8 +104,8 @@ export function IncidentsTab() {
         title="Incidencias"
         sub="Excepciones, desembolsos fallidos, diferencias de conciliación y datos de nómina"
         action={
-          <div className="flex items-center gap-3">
-            <Select aria-label="Estado" value={status} onChange={(e) => setStatus(e.target.value)} options={Object.entries(incidentStatus).map(([value, [label]]) => ({ value, label }))} placeholder="Todos los estados" className="w-48" />
+          <div className="flex items-center gap-3 max-lg:w-full max-lg:flex-wrap">
+            <Select aria-label="Estado" value={status} onChange={(e) => setStatus(e.target.value)} options={Object.entries(incidentStatus).map(([value, [label]]) => ({ value, label }))} placeholder="Todos los estados" className="w-full sm:w-48" />
             {canWrite && <Button size="sm" onClick={() => setCreate(true)}><Plus />Nueva incidencia</Button>}
           </div>
         }
@@ -119,8 +119,8 @@ export function IncidentsTab() {
       ) : (
         <ul className="flex flex-col divide-y divide-line-soft">
           {data.map((i) => (
-            <li key={i.id} className="flex items-start gap-4 py-3.5">
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <li key={i.id} className="flex items-start gap-4 py-3.5 max-lg:flex-wrap max-lg:gap-y-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-1 max-lg:basis-full">
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="text-[15px] font-bold text-ink">{i.title}</span>
                   <span className="text-xs font-semibold text-ink-3">{incidentCategories[i.category] ?? i.category}</span>

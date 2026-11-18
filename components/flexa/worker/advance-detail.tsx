@@ -48,15 +48,16 @@ export function AdvanceDetail() {
   ];
 
   return (
-    <ScreenFrame title="Solicitud" back="/app/movimientos?vista=solicitudes">
-      <Card tone="mint" className="flex flex-col items-center gap-2 p-6 text-center">
+    // md+: amount and notices span the grid, timeline and details sit side by side, actions are centered below.
+    <ScreenFrame title="Solicitud" back="/app/movimientos?vista=solicitudes" className="md:grid md:grid-cols-2">
+      <Card tone="mint" className="flex flex-col items-center gap-2 p-6 text-center md:col-span-2">
         <span className="text-sm font-semibold text-green-900">Monto solicitado</span>
         <span className="text-display text-ink tabular-nums">{money(a.amount)}</span>
         <Badge tone={st.tone}>{st.label}</Badge>
       </Card>
 
-      {a.status === "EXCEPTION" && a.exceptionReason && <Notice tone="warning" title="Tu empresa la está revisando">{a.exceptionReason}</Notice>}
-      {a.overRecommended && <Notice tone="info">Este retiro superó el monto recomendado en su momento.</Notice>}
+      {a.status === "EXCEPTION" && a.exceptionReason && <Notice tone="warning" title="Tu empresa la está revisando" className="md:col-span-2">{a.exceptionReason}</Notice>}
+      {a.overRecommended && <Notice tone="info" className="md:col-span-2">Este retiro superó el monto recomendado en su momento.</Notice>}
 
       <Card tone="soft" className="flex flex-col gap-4 p-5">
         <h2 className="text-h3 text-ink">Estado</h2>
@@ -75,14 +76,14 @@ export function AdvanceDetail() {
       </Card>
 
       {a.status === "DISBURSED" && (
-        <ButtonLink href={`/app/comprobante/${a.code}`} variant="soft">
+        <ButtonLink href={`/app/comprobante/${a.code}`} variant="soft" className="md:col-span-2 md:mx-auto md:w-full md:max-w-sm">
           <ReceiptIcon />
           Ver comprobante
         </ButtonLink>
       )}
 
       {CANCELLABLE.includes(a.status) && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 md:col-span-2 md:mx-auto md:w-full md:max-w-sm">
           {actionError && <Notice tone="error">{actionError}</Notice>}
           {confirming ? (
             <Card tone="red" className="flex flex-col gap-3 p-4">

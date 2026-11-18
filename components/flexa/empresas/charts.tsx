@@ -1,6 +1,7 @@
 "use client";
 
 import { useReducedMotion } from "motion/react";
+import type { CSSProperties } from "react";
 import { Bar, BarChart, CartesianGrid, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { short } from "@/components/flexa/charts";
 import { money } from "@/lib/api";
@@ -39,10 +40,11 @@ export function Legend({ series }: { series: Series[] }) {
 }
 
 // Grouped bars with optional line series (e.g. budget). Money by default.
-export function GroupBars({ data, x, series, height = 280, fmt = money, tick = short }: { data: object[]; x: string; series: Series[]; height?: number; fmt?: (n: number) => string; tick?: (n: number) => string }) {
+// minGroup (px per category): below lg the chart keeps that width and scrolls sideways so long x labels are not skipped or clipped.
+export function GroupBars({ data, x, series, height = 280, fmt = money, tick = short, minGroup }: { data: object[]; x: string; series: Series[]; height?: number; fmt?: (n: number) => string; tick?: (n: number) => string; minGroup?: number }) {
   const reduce = useReducedMotion();
-  return (
-    <div className="w-full min-w-0" style={{ height }}>
+  const chart = (
+    <div className={cn("w-full min-w-0", minGroup && "max-lg:min-w-(--chart-min)")} style={{ height, ...(minGroup ? { "--chart-min": `${data.length * minGroup + 64}px` } : {}) } as CSSProperties}>
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height }}>
         <ComposedChart data={data} margin={{ top: 8, right: 0, left: 0, bottom: 0 }} barGap={4}>
           <CartesianGrid vertical={false} stroke="#e5ece3" strokeDasharray="4 4" />
@@ -60,6 +62,7 @@ export function GroupBars({ data, x, series, height = 280, fmt = money, tick = s
       </ResponsiveContainer>
     </div>
   );
+  return minGroup ? <div className="overflow-x-auto">{chart}</div> : chart;
 }
 
 // Horizontal single-series bars (for counts or money by category).
@@ -87,7 +90,7 @@ export function ShareList({ items }: { items: { name: string; value: number; pct
     <ul className="flex flex-col gap-3.5">
       {items.map((i) => (
         <li key={i.name} className="flex flex-col gap-1.5">
-          <span className="flex items-baseline justify-between gap-3 text-sm">
+          <span className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm lg:flex-nowrap">
             <span className="font-bold text-ink">{i.name}</span>
             <span className="font-semibold text-ink-2 tabular-nums">
               {money(i.value)} <span className="text-ink-3">· {i.pct.toLocaleString("es-CO", { maximumFractionDigits: 1 })}%</span>

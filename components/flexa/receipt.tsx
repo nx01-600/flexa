@@ -51,7 +51,7 @@ export function Receipt({ data, fresh }: { data: ReceiptData; fresh: boolean }) 
     <>
       <Backdrop variant="inner" wash />
       <TopBar title="Comprobante" back={fresh ? "/app" : "/app/movimientos"} />
-      <main className="flex flex-col gap-6 px-5 pt-5 pb-10">
+      <main className="flex flex-col gap-6 px-5 pt-5 pb-10 md:mx-auto md:max-w-[600px]">
         <section className="flex flex-col items-center gap-5 text-center">
           <motion.span
             initial={animate ? { scale: 0.6, opacity: 0 } : false}

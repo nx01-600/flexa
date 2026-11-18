@@ -110,13 +110,13 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Backdrop variant="inner" />
-      <header className="flex h-16 items-center justify-between px-5 pt-2">
+      <header className="flex h-16 items-center justify-between px-5 pt-2 md:mx-auto md:max-w-[600px]">
         <Logo className="h-7" />
         <button type="button" onClick={() => logout("worker")} className="text-sm font-bold text-ink-2 underline-offset-4 hover:text-ink hover:underline">
           Salir
         </button>
       </header>
-      <main className="flex flex-col gap-5 px-5 pt-2 pb-10">
+      <main className="flex flex-col gap-5 px-5 pt-2 pb-10 md:mx-auto md:max-w-[600px]">
         <div className="flex flex-col gap-1">
           <h1 className="text-h1 text-ink">Completa tu registro</h1>
           <p className="text-[15px] font-medium text-ink-2">Tres pasos y podrás acceder a tu salario.</p>

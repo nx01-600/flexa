@@ -49,12 +49,12 @@ export default function TicketDetail() {
             return (
               <li key={m.id} className={cn("flex gap-3", mine && "flex-row-reverse")}>
                 <Avatar name={m.author.name} />
-                <div className={cn("flex max-w-[80%] flex-col gap-1 rounded-lg px-4 py-3", flexa ? "bg-mint-2" : mine ? "bg-green-100" : "bg-head")}>
+                <div className={cn("flex max-w-[80%] flex-col gap-1 rounded-lg px-4 py-3 max-lg:min-w-0", flexa ? "bg-mint-2" : mine ? "bg-green-100" : "bg-head")}>
                   <span className="text-[13px] font-bold text-ink">
                     {flexa ? "Equipo Flexa" : m.author.name}{" "}
                     <span className="font-semibold text-ink-3">· {flexa ? "" : `${roleLabel[m.author.role] ?? m.author.role} · `}{dateTime(m.createdAt)}</span>
                   </span>
-                  <p className="text-[15px] font-medium whitespace-pre-wrap text-ink">{m.body}</p>
+                  <p className="text-[15px] font-medium whitespace-pre-wrap text-ink max-lg:break-words">{m.body}</p>
                 </div>
               </li>
             );

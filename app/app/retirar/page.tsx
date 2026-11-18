@@ -87,7 +87,9 @@ export default function Withdraw() {
     <>
       <Backdrop variant="inner" />
       <TopBar title="Retirar" />
-      <main className="flex flex-col gap-5 px-5 pt-3 pb-40">
+      {/* md+: two columns (balance + amount | destination + summary); the wrappers are display:contents below md. */}
+      <main className="flex flex-col gap-5 px-5 pt-3 pb-40 md:grid md:grid-cols-2 md:items-start">
+        <div className="contents md:flex md:flex-col md:gap-5">
         {earnings.error ? (
           <ErrorState error={earnings.error} onRetry={earnings.reload} title="No pudimos consultar tu disponible" />
         ) : (
@@ -178,7 +180,9 @@ export default function Withdraw() {
             </div>
           )}
         </Card>
+        </div>
 
+        <div className="contents md:flex md:flex-col md:gap-5">
         <Card tone="soft" className="flex flex-col gap-3 p-5">
           <h2 className="text-h3 text-ink">¿A dónde lo enviamos?</h2>
           {accounts.loading && !accounts.data ? (
@@ -256,11 +260,12 @@ export default function Withdraw() {
             </p>
           )}
         </Card>
+        </div>
 
-        {sendError && <Notice tone="error">{sendError}</Notice>}
+        {sendError && <Notice tone="error" className="md:col-span-2">{sendError}</Notice>}
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[430px] bg-linear-to-t from-page from-60% to-page/0 px-5 pt-8 pb-[max(16px,env(safe-area-inset-bottom))]">
+      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[430px] md:max-w-[760px] bg-linear-to-t from-page from-60% to-page/0 px-5 pt-8 pb-[max(16px,env(safe-area-inset-bottom))]">
         <Button className="w-full" disabled={!ready || sending} onClick={() => send(false)}>
           {sending ? "Enviando..." : amount && current?.valid ? `Retirar ${money(amount)}` : "Continuar"}
         </Button>
@@ -326,7 +331,7 @@ function AckWarning({
       animate={{ opacity: 1, scale: 1 }}
       exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
       transition={{ duration: reduce ? 0.01 : 0.2, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed inset-0 z-50 mx-auto isolate flex max-w-[430px] flex-col overflow-y-auto bg-warning-screen px-6 pt-[max(48px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))]"
+      className="fixed inset-0 z-50 mx-auto isolate flex max-w-[430px] flex-col overflow-y-auto bg-warning-screen px-6 pt-[max(48px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))] md:max-w-none md:px-[max(24px,calc(50%-260px))]"
     >
       <Backdrop variant="warning" />
       <div className="flex flex-col items-center gap-4 text-center">
@@ -388,7 +393,7 @@ function Result({ advance: a }: { advance: Advance }) {
     <>
       <Backdrop variant="inner" wash />
       <TopBar title="Tu retiro" />
-      <main className="flex flex-col gap-5 px-5 pt-3 pb-10">
+      <main className="flex flex-col gap-5 px-5 pt-3 pb-10 md:grid md:grid-cols-2 md:items-start">
         <Card tone={paid ? "mint" : a.status === "FAILED" ? "red" : "amber"} className="flex flex-col items-center gap-2 p-6 text-center">
           <span className="text-sm font-semibold text-ink-2">Solicitud {a.code}</span>
           <span className="text-display text-ink tabular-nums">{money(a.amount)}</span>
@@ -403,7 +408,7 @@ function Result({ advance: a }: { advance: Advance }) {
                   : "Estamos procesando tu solicitud."}
           </p>
         </Card>
-        <Card tone="soft" className="flex flex-col gap-4 p-5">
+        <Card tone="soft" className="flex flex-col gap-4 p-5 md:col-start-2 md:row-span-2 md:row-start-1">
           <h2 className="text-h3 text-ink">Estado</h2>
           <Timeline events={a.events ?? []} status={a.status} />
         </Card>

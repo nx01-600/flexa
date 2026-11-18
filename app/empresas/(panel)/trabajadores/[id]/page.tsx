@@ -66,15 +66,15 @@ export default function WorkerDetail() {
       {!w.enabled && w.disabledReason && <Notice tone="amber">Deshabilitado: {w.disabledReason}</Notice>}
 
       <div className="grid gap-5 xl:grid-cols-[1fr_1.4fr]">
-        <Card tone="mint" className="flex flex-col gap-5 p-6">
+        <Card tone="mint" className="flex flex-col gap-5 p-4 max-lg:min-w-0 sm:p-6">
           <div className="flex items-center gap-4">
             <Avatar name={name} className="size-16" />
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 max-lg:min-w-0">
               <div className="flex flex-wrap gap-2">
                 <WorkerBadge value={w.status} />
                 <Badge tone={w.enabled ? "green" : "gray"}>{w.enabled ? "Acceso habilitado" : "Sin acceso"}</Badge>
               </div>
-              <span className="text-[13px] font-semibold text-green-800">{w.email}{w.phone ? ` · ${w.phone}` : ""}</span>
+              <span className="text-[13px] font-semibold text-green-800 max-lg:break-words">{w.email}{w.phone ? ` · ${w.phone}` : ""}</span>
             </div>
           </div>
           <Facts

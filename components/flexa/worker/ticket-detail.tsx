@@ -67,7 +67,7 @@ export function TicketDetail() {
         {thread.map((m) => {
           const mine = m.author.role === "WORKER";
           return (
-            <li key={m.id} className={cn("flex max-w-[86%] flex-col gap-1", mine ? "self-end items-end" : "self-start")}>
+            <li key={m.id} className={cn("flex max-w-[86%] flex-col gap-1 md:max-w-[70%]", mine ? "self-end items-end" : "self-start")}>
               <span className="px-1 text-xs font-bold text-ink-3">{mine ? "Tú" : m.author.name}</span>
               <p className={cn("rounded-lg px-4 py-3 text-sm font-medium whitespace-pre-wrap", mine ? "rounded-br-sm bg-green-600 text-white" : "rounded-bl-sm bg-surface text-ink shadow-sm ring-1 ring-line")}>
                 {m.body}

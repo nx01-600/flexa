@@ -54,7 +54,7 @@ export function WorkerBulkUpload({ open, onClose, onDone }: { open: boolean; onC
         </>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
               ["Creados", result.created],
               ["Actualizados", result.updated],
@@ -133,7 +133,7 @@ export function WorkerForm({ worker, onSaved, onCancel }: { worker?: Worker; onS
         </label>
       )}
       {error && <Notice tone="red">{error}</Notice>}
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         {onCancel && <Button type="button" variant="outline" size="md" onClick={onCancel}>Cancelar</Button>}
         <Button type="submit" size="md" disabled={busy}>{busy ? "Guardando…" : edit ? "Guardar cambios" : "Registrar trabajador"}</Button>
       </div>

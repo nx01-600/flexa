@@ -73,13 +73,13 @@ function Audit() {
       <PageHeader title="Trazabilidad" sub="Registro de todas las acciones relevantes en tu empresa: quién, qué y cuándo." />
       <SectionCard>
         <div className="flex flex-wrap items-end gap-3">
-          <FormField label="Entidad" className="w-60">
+          <FormField label="Entidad" className="w-full sm:w-60">
             <Select value={entity} onChange={(e) => setEntity(e.target.value)} options={Object.entries(entities).map(([value, label]) => ({ value, label }))} placeholder="Todas" />
           </FormField>
-          <FormField label="ID del registro" className="w-80">
+          <FormField label="ID del registro" className="w-full sm:w-80">
             <TextInput value={entityId} onChange={(e) => setEntityId(e.target.value)} placeholder="Opcional" />
           </FormField>
-          <span className="mb-3 ml-auto text-sm font-semibold text-ink-2 tabular-nums">{data ? `${data.length} eventos` : ""}</span>
+          <span className="ml-auto text-sm font-semibold text-ink-2 tabular-nums sm:mb-3">{data ? `${data.length} eventos` : ""}</span>
         </div>
         {error ? (
           <ErrorState error={error} onRetry={reload} />

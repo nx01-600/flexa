@@ -12,7 +12,7 @@ export default function CompanyLogin() {
     <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-page">
       <Backdrop variant="split" />
 
-      <div className="mx-auto grid w-full max-w-[1200px] flex-1 items-center gap-16 px-6 py-14 lg:grid-cols-2">
+      <div className="mx-auto grid w-full max-w-[1200px] flex-1 items-center gap-16 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-2">
         {/* brand side */}
         <section className="hidden flex-col items-center text-center lg:flex">
           <Logo className="h-auto w-[300px]" />
@@ -26,17 +26,23 @@ export default function CompanyLogin() {
 
         {/* login card */}
         <section className="flex justify-center">
-          <div className="flex w-full max-w-[460px] flex-col items-center rounded-2xl bg-card-login px-8 py-10 text-center shadow-raised ring-1 ring-white/80 ring-inset sm:px-10">
+          <div className="flex w-full max-w-[460px] flex-col items-center rounded-2xl bg-card-login px-5 py-8 text-center shadow-raised ring-1 ring-white/80 ring-inset sm:px-10 sm:py-10">
             <Logo className="h-auto w-[150px]" />
             <p className="mt-1 text-xl font-semibold text-green-900">Empresas</p>
             <h1 className="mt-7 text-[28px] leading-tight font-extrabold tracking-[-0.02em] text-ink">Bienvenido</h1>
             <p className="mt-1.5 mb-7 text-[15px] font-medium text-ink-2">Ingresa a tu cuenta para continuar.</p>
-            <LoginForm userLabel="Usuario" userPlaceholder="Usuario (NIT o correo corporativo)" to="/empresas" surface="company" size="xl" />
+            <LoginForm userLabel="Usuario" userPlaceholder="Usuario (NIT o correo corporativo)" to="/empresas" surface="company" size="xl" smallPlaceholder />
+            <p className="mt-6 text-sm font-medium text-ink-2">
+              ¿Eres trabajador?{" "}
+              <Link href="/app/login" className="font-bold text-green-700 underline underline-offset-4 hover:text-green-900">
+                Ingresa aquí
+              </Link>
+            </p>
           </div>
         </section>
       </div>
 
-      <Link href="#" className="mb-8 ml-8 inline-flex items-center gap-2.5 self-start text-sm font-semibold text-green-900 hover:text-green-700">
+      <Link href="#" className="mb-6 ml-5 inline-flex sm:mb-8 sm:ml-8 items-center gap-2.5 self-start text-sm font-semibold text-green-900 hover:text-green-700">
         <span className="grid size-8 place-items-center rounded-full bg-green-500 text-white shadow-xs">
           <CircleHelp className="size-5 stroke-[2.5]" />
         </span>

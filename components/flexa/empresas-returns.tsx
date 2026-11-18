@@ -23,7 +23,7 @@ export function ReturnsView() {
   if (loading && !data) return <Loading rows={5} />;
   if (!data?.length)
     return (
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <EmptyState icon={BadgeCheck} title="Aún no hay conciliaciones" text="Cuando cierres un periodo y reportes los descuentos, verás aquí el historial." />
       </Card>
     );
@@ -39,7 +39,7 @@ export function ReturnsView() {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={HandCoins} value={money(last.disbursedTotal)} label={`Anticipos entregados en ${last.period?.label}`} />
         <Kpi icon={Banknote} value={money(last.compensatedTotal)} label="Descontados en nómina" tone="teal" />
         <Kpi icon={Clock} value={money(pending)} label="Pendiente por conciliar" tone="amber" />
@@ -47,12 +47,12 @@ export function ReturnsView() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
-        <Card className="flex flex-col gap-4 p-6">
+        <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6 lg:min-w-auto">
           <CardHead title="Entregado frente a descontado" sub="Por periodo de nómina" action={<Legend series={series} />} />
           <GroupBars data={months} x="month" series={series} />
         </Card>
 
-        <Card tone="mint" className="relative isolate flex flex-col gap-4 overflow-hidden p-6">
+        <Card tone="mint" className="relative isolate flex min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:min-w-auto">
           <Blob shape={2} tone="deep" className="-right-20 -bottom-24 -z-10 size-[260px] opacity-60" />
           <CardHead title="Cómo funciona la conciliación" />
           <ol className="flex flex-col gap-4">
@@ -81,7 +81,7 @@ export function ReturnsView() {
         </Card>
       </div>
 
-      <Card className="flex flex-col gap-4 p-6">
+      <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6 lg:min-w-auto">
         <CardHead title="Historial de conciliaciones" sub="Detalle por periodo de anticipos y descuentos" />
         <Table>
           <thead>

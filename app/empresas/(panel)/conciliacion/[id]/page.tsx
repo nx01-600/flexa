@@ -76,7 +76,7 @@ export default function CompensationPeriod() {
       </SectionCard>
 
       {/* Steps: close, export, report, reconcile */}
-      <div className="grid gap-4 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-4">
         <Step n={1} title="Cerrar el periodo" text="Consolida lo anticipado por trabajador." done={!open}>
           {open && canWrite && <Button size="sm" onClick={() => setDialog("close")}><Lock />Cerrar periodo</Button>}
         </Step>
@@ -123,7 +123,7 @@ export default function CompensationPeriod() {
         {lines.length ? (
           <Table>
             <thead>
-              <tr><Th>Trabajador</Th><Th>Sede</Th><Th className="text-right">Anticipos</Th><Th className="text-right">A compensar</Th><Th className="text-right">Descontado</Th><Th className="text-right">Diferencia</Th><Th>Estado</Th>{canWrite && !reconciled && <Th className="w-28"><span className="sr-only">Acciones</span></Th>}</tr>
+              <tr><Th>Trabajador</Th><Th>Sede</Th><Th className="text-right">Anticipos</Th><Th className="text-right">A compensar</Th><Th className="text-right">Descontado</Th><Th className="text-right">Diferencia</Th><Th>Estado</Th>{canWrite && !reconciled && <Th className="relative w-28"><span className="sr-only">Acciones</span></Th>}</tr>
             </thead>
             <tbody>
               {lines.map((l) => (

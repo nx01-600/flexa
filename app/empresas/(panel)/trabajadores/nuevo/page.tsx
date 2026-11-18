@@ -16,7 +16,7 @@ export default function NewWorker() {
         title="Registrar trabajador"
         sub="Queda habilitado en Flexa y podrá crear su cuenta con su número de documento."
       />
-      <Card className="max-w-3xl p-6">
+      <Card className="max-w-3xl p-4 sm:p-6">
         {canWrite ? <WorkerForm onSaved={(w) => router.push(`/empresas/trabajadores/${w.id}`)} onCancel={() => router.back()} /> : <ReadOnlyHint />}
       </Card>
     </>

@@ -47,7 +47,7 @@ export default function AdvanceDetail() {
             sub={a.status === "EXCEPTION" ? (a.exceptionReason ?? "La solicitud superó una regla de revisión.") : "Puedes reintentar cuando el trabajador corrija su cuenta o el proveedor se recupere."}
           />
           {canWrite ? (
-            <div className="flex gap-3">
+            <div className="flex gap-3 max-lg:flex-wrap">
               {a.status === "EXCEPTION" ? (
                 <>
                   <Button size="md" onClick={() => setDecision("approve")}><Check />Aprobar y desembolsar</Button>
@@ -114,9 +114,9 @@ export default function AdvanceDetail() {
         {a.audit.length ? (
           <ul className="flex flex-col divide-y divide-line-soft">
             {a.audit.map((l) => (
-              <li key={l.id} className="flex items-center justify-between gap-4 py-2.5 text-sm">
-                <span className="font-bold text-ink">{l.action}</span>
-                <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink-3">{l.data ? JSON.stringify(l.data) : ""}</span>
+              <li key={l.id} className="flex items-center justify-between gap-4 py-2.5 text-sm max-lg:flex-wrap max-lg:gap-y-1">
+                <span className="font-bold text-ink max-lg:break-all">{l.action}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink-3 max-lg:order-last max-lg:basis-full">{l.data ? JSON.stringify(l.data) : ""}</span>
                 <span className="text-ink-2">{dateTime(l.createdAt)}</span>
               </li>
             ))}
