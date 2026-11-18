@@ -32,14 +32,14 @@ export default function Support() {
         ) : !data?.length ? (
           <EmptyState icon={MessageSquare} title="Sin solicitudes" text="Si tienes una duda o un problema con la operación, escríbenos." />
         ) : (
-          <Table>
-            <thead><tr><Th>Código</Th><Th>Asunto</Th><Th>Categoría</Th><Th>Creada por</Th><Th>Actualizada</Th><Th className="text-right">Mensajes</Th><Th>Estado</Th></tr></thead>
+          <Table className="[&_td]:px-3 [&_th]:px-3 2xl:[&_td]:px-4 2xl:[&_th]:px-4">
+            <thead><tr><Th>Código</Th><Th>Asunto</Th><Th className="max-2xl:hidden">Categoría</Th><Th>Creada por</Th><Th>Actualizada</Th><Th className="text-right">Mensajes</Th><Th>Estado</Th></tr></thead>
             <tbody>
               {data.map((t) => (
                 <tr key={t.id} className="transition-colors hover:bg-mint-1">
                   <Td><Link href={`/empresas/soporte/${t.id}`} className="font-bold text-green-700 hover:underline">{t.code}</Link></Td>
-                  <Td className="max-w-80 truncate font-bold">{t.subject}</Td>
-                  <Td className="text-ink-2">{t.category}</Td>
+                  <Td className="max-w-44 truncate font-bold 2xl:max-w-80">{t.subject}</Td>
+                  <Td className="text-ink-2 max-2xl:hidden">{t.category}</Td>
                   <Td className="text-ink-2">{t.user.name} <span className="text-ink-3">· {roleLabel[t.user.role] ?? t.user.role}</span></Td>
                   <Td className="text-ink-2">{dateTime(t.updatedAt)}</Td>
                   <Td className="text-right tabular-nums">{t._count?.messages ?? 0}</Td>

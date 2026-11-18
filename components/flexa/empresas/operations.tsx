@@ -66,9 +66,9 @@ export function AdvancesTab({
       ) : !data?.length ? (
         <EmptyState icon={HandCoins} title="No hay solicitudes" text="Ajusta los filtros para ver otras operaciones." />
       ) : (
-        <Table className={cn(loading && "opacity-60")}>
+        <Table className={cn("[&_td]:px-3 [&_th]:px-3 2xl:[&_td]:px-4 2xl:[&_th]:px-4", loading && "opacity-60")}>
           <thead>
-            <tr><Th>Código</Th><Th>Trabajador</Th><Th>Sede</Th><Th>Fecha</Th><Th className="text-right">Monto</Th><Th>Banco</Th><Th>Periodo</Th><Th>Estado</Th></tr>
+            <tr><Th>Código</Th><Th>Trabajador</Th><Th>Sede</Th><Th>Fecha</Th><Th className="text-right">Monto</Th><Th className="max-2xl:hidden">Banco</Th><Th className="max-2xl:hidden">Periodo</Th><Th>Estado</Th></tr>
           </thead>
           <tbody>
             {data.map((a) => (
@@ -78,8 +78,8 @@ export function AdvancesTab({
                 <Td className="text-ink-2">{a.worker?.site?.name ?? "—"}</Td>
                 <Td className="text-ink-2">{dateTime(a.createdAt)}</Td>
                 <Td className="text-right font-bold tabular-nums">{money(a.amount)}</Td>
-                <Td className="text-ink-2">{a.bankAccount?.bank ?? "—"}</Td>
-                <Td className="text-ink-2">{a.period?.label}</Td>
+                <Td className="text-ink-2 max-2xl:hidden">{a.bankAccount?.bank ?? "—"}</Td>
+                <Td className="text-ink-2 max-2xl:hidden">{a.period?.label}</Td>
                 <Td><AdvanceBadge value={a.status} /></Td>
               </tr>
             ))}

@@ -113,7 +113,7 @@ export default function Workers() {
         ) : workers.loading && !workers.data ? (
           <Loading rows={6} />
         ) : (
-          <Table className={cn(workers.loading && "opacity-60 transition-opacity")}>
+          <Table className={cn("[&_td]:px-3 [&_th]:px-3 2xl:[&_td]:px-4 2xl:[&_th]:px-4", workers.loading && "opacity-60 transition-opacity")}>
             <thead>
               <tr>
                 {canWrite && (
@@ -127,7 +127,7 @@ export default function Workers() {
                     />
                   </Th>
                 )}
-                <Th>Nombre</Th><Th>Cédula</Th><Th>Sede</Th><Th>Estado</Th><Th className="text-right">Salario</Th><Th className="text-right">Retirado</Th><Th>Uso del tope</Th>
+                <Th>Nombre</Th><Th className="max-2xl:hidden">Cédula</Th><Th>Sede</Th><Th>Estado</Th><Th className="text-right">Salario</Th><Th className="text-right">Retirado</Th><Th>Uso del tope</Th>
               </tr>
             </thead>
             <tbody>
@@ -148,7 +148,7 @@ export default function Workers() {
                         </span>
                       </Link>
                     </Td>
-                    <Td className="text-ink-2 tabular-nums">{w.docNumber}</Td>
+                    <Td className="text-ink-2 tabular-nums max-2xl:hidden">{w.docNumber}</Td>
                     <Td className="text-ink-2">{w.site?.name ?? "—"}</Td>
                     <Td><WorkerBadge value={w.status} /></Td>
                     <Td className="text-right text-ink-2 tabular-nums">{money(w.baseSalary)}</Td>
@@ -156,7 +156,7 @@ export default function Workers() {
                     <Td>
                       {w.enabled ? (
                         <span className="flex items-center gap-3">
-                          <span className="h-2 w-24 rounded-full bg-green-100">
+                          <span className="h-2 w-12 rounded-full bg-green-100 2xl:w-24">
                             <span className={cn("block h-full rounded-full", high ? "bg-linear-to-r from-[#f2c14e] to-warning-icon" : "bg-linear-to-r from-green-300 to-green-500")} style={{ width: `${Math.min(use, 100)}%` }} />
                           </span>
                           <span className={cn("w-10 text-[13px] font-bold tabular-nums", high ? "text-warning" : "text-ink-2")}>{use}%</span>

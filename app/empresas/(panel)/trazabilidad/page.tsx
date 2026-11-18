@@ -71,7 +71,7 @@ function Data({ value }: { value: unknown }) {
   if (value == null) return <span className="text-ink-3">—</span>;
   const text = JSON.stringify(value);
   return (
-    <span title={text} className="block max-w-[420px] truncate font-mono text-xs text-ink-2">
+    <span title={text} className="block max-w-[260px] truncate 2xl:max-w-[420px] font-mono text-xs text-ink-2">
       {text}
     </span>
   );
