@@ -27,6 +27,13 @@ Full stack. The frontend talks to the **FLEXA API** in [`backend/`](backend/READ
 | Flexa Empresas | `/empresas` | Talento Humano (admin) and Finanzas (read-only) |
 | Consola FLEXA | `/admin` | Administrador FLEXA |
 
+## User manuals
+
+Spanish PDF guides with screenshots, one per surface:
+
+- [Worker app manual](docs/manuals/FLEXA-Manual-de-usuario-Trabajador.pdf)
+- [Company panel manual](docs/manuals/FLEXA-Manual-de-usuario-Empresa.pdf)
+
 ## Run it
 
 ```bash
