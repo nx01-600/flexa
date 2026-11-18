@@ -4,6 +4,10 @@ import { WorkerGuard } from "@/components/flexa/worker/guard";
 
 export const metadata: Metadata = { title: "Flexa" };
 
+// The session lives in localStorage, so WorkerGuard renders nothing on the server and
+// Next cannot validate instant navigation for these segments. Opt out until auth moves to cookies.
+export const instant = false;
+
 // Worker app. Below md: a phone-width column (centered with a shadow from sm up).
 // From md up the column becomes a full-bleed canvas (bg-page, no shadow) and the
 // inner frame below sets the content width. `isolate` lets each screen's Backdrop sit

@@ -88,9 +88,46 @@ export function SideNav() {
           })}
         </ul>
       </nav>
+      {/* Drawer-only destinations, so the hamburger can hide from md up. */}
+      <nav aria-label="Más" className="mt-4 border-t border-line-soft pt-4">
+        <ul className="flex flex-col gap-1">
+          {extra.map(({ href, label, icon: Icon }) => {
+            const active = isActive(path, href);
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1 rounded-lg py-2 text-center text-[11px] leading-tight transition-colors duration-150 lg:h-12 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-md lg:px-3 lg:py-0 lg:text-left lg:text-[15px]",
+                    active ? "font-bold text-green-700 lg:bg-green-100 lg:text-green-900" : "font-semibold text-ink-2 hover:text-ink lg:hover:bg-green-50",
+                  )}
+                >
+                  <Icon className={cn("size-5", active && "stroke-[2.5]")} />
+                  {label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      <button
+        type="button"
+        onClick={() => logout("worker")}
+        className="mt-auto flex flex-col items-center gap-1 rounded-lg py-2 text-[11px] font-bold text-danger transition-colors hover:bg-danger-soft lg:h-12 lg:flex-row lg:gap-3 lg:rounded-md lg:px-3 lg:py-0 lg:text-[15px]"
+      >
+        <LogOut className="size-5" />
+        Cerrar sesión
+      </button>
     </aside>
   );
 }
+
+const extra = [
+  { href: "/app/salario", label: "Mi salario", icon: Wallet },
+  { href: "/app/servicios", label: "Pagos y recargas", icon: LayoutGrid },
+  { href: "/app/ayuda", label: "Ayuda", icon: CircleHelp },
+];
 
 // Round white button used for back / close / menu in headers.
 const roundBtn =
@@ -124,7 +161,8 @@ export function MenuButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" aria-label="Abrir menú" onClick={() => setOpen(true)} className={roundBtn}>
+      {/* md+ has the side nav with the same destinations. */}
+      <button type="button" aria-label="Abrir menú" onClick={() => setOpen(true)} className={cn(roundBtn, "md:hidden")}>
         <Menu />
       </button>
       <Sheet open={open} onOpenChange={setOpen}>

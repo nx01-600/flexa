@@ -41,7 +41,10 @@ export default function WorkerHome() {
     <main className="flex flex-col gap-5 px-5 pt-3 lg:grid lg:grid-cols-2 lg:gap-x-4">
       <Backdrop variant="home" />
       <header className="grid h-14 grid-cols-[88px_1fr_88px] items-center lg:col-span-2">
-        <MenuButton />
+        {/* Wrapper keeps the grid cell when the button hides from md up. */}
+        <div>
+          <MenuButton />
+        </div>
         <Logo className="h-7 justify-self-center md:invisible" />
         <div className="flex items-center justify-end gap-2">
           <Link
