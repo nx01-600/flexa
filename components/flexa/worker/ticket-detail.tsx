@@ -1,5 +1,6 @@
 "use client";
 
+import { useSessionName } from "@/components/flexa/worker/guard";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -8,7 +9,7 @@ import { ScreenFrame } from "@/components/flexa/worker/screen-frame";
 import { ErrorState, LoadingCards, Notice } from "@/components/flexa/worker/states";
 import { stamp, statusOf, ticketStatus, type Ticket } from "@/components/flexa/worker/types";
 import { Badge, Button, Card } from "@/components/flexa/ui";
-import { api, ApiError, getSession, money, useApi } from "@/lib/api";
+import { api, ApiError, money, useApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export function TicketDetail() {
@@ -17,7 +18,7 @@ export function TicketDetail() {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const me = getSession("worker")?.user.name;
+  const me = useSessionName();
 
   const reply = async (e: React.FormEvent) => {
     e.preventDefault();

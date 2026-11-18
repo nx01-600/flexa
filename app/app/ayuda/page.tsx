@@ -35,7 +35,7 @@ export default function Help() {
   return (
     <>
       <Backdrop variant="inner" />
-      <TopBar title="Ayuda" back={signedIn === false ? "/app/login" : "/app"} />
+      <TopBar title="Ayuda" back={signedIn === false ? "/app/login" : "/app"} tab={signedIn === true} />
       <main className="flex flex-col gap-5 px-5 pt-3 pb-10">
         <Card tone="mint" className="relative isolate flex flex-col gap-4 overflow-hidden p-5">
           <Blob shape={0} tone="deep" className="-top-16 -right-16 -z-10 size-48 opacity-70" />

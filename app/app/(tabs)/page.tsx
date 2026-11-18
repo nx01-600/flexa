@@ -13,7 +13,8 @@ import { Avatar } from "@/components/flexa/worker/avatar";
 import { EmptyState, ErrorState, LoadingRows, Notice, Skeleton } from "@/components/flexa/worker/states";
 import type { Alert, Earnings, Movement, Profile, Wellness } from "@/components/flexa/worker/types";
 import { Card, IconBox, SectionTitle } from "@/components/flexa/ui";
-import { dateFmt, getSession, money, timeFmt, useApi } from "@/lib/api";
+import { dateFmt, money, timeFmt, useApi } from "@/lib/api";
+import { useSessionName } from "@/components/flexa/worker/guard";
 
 export default function WorkerHome() {
   const router = useRouter();
@@ -29,7 +30,8 @@ export default function WorkerHome() {
     if (incomplete) router.replace("/app/onboarding");
   }, [incomplete, router]);
 
-  const name = profile.data ? `${profile.data.firstName} ${profile.data.lastName}` : (getSession("worker")?.user.name ?? "");
+  const sessionName = useSessionName();
+  const name = profile.data ? `${profile.data.firstName} ${profile.data.lastName}` : sessionName;
   const firstName = name.split(" ")[0];
   const e = earnings.data;
   const tips = wellness.data?.tips ?? [];

@@ -6,6 +6,7 @@ import { ArrowLeftRight, ChartColumn, ChevronLeft, CircleHelp, House, LayoutGrid
 import { useState, type ReactNode } from "react";
 import { Logo } from "@/components/flexa/logo";
 import { logout } from "@/lib/api";
+import { useSignedIn } from "@/components/flexa/worker/guard";
 import { IconBox } from "@/components/flexa/ui";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -128,6 +129,27 @@ const extra = [
   { href: "/app/servicios", label: "Pagos y recargas", icon: LayoutGrid },
   { href: "/app/ayuda", label: "Ayuda", icon: CircleHelp },
 ];
+
+// Pre-account screens: no side nav. Login gets the full-width canvas, the others a centered column.
+const NO_NAV = ["/app/login", "/app/registro", "/app/onboarding"];
+
+// md+ frame for every worker screen, chosen by route. It must not depend on CSS :has() over
+// the page tree: Next keeps previously visited routes mounted (hidden) for instant back
+// navigation, so a hidden page's markers would still match and break the width.
+// Below md every wrapper is `display: contents`, so phones are untouched.
+export function WorkerFrame({ children }: { children: ReactNode }) {
+  const path = usePathname().replace(/\/$/, "");
+  const signedIn = useSignedIn();
+  if (path === "/app/login") return <div className="contents">{children}</div>;
+  // null = session not known yet (server/hydration): assume signed in to avoid a layout jump.
+  if (NO_NAV.includes(path) || signedIn === false) return <div className="contents md:mx-auto md:block md:max-w-[760px]">{children}</div>;
+  return (
+    <div className="contents md:mx-auto md:flex md:max-w-[1100px]">
+      <SideNav />
+      <div className="contents md:block md:min-w-0 md:flex-1 md:px-4 md:pb-10 lg:px-8">{children}</div>
+    </div>
+  );
+}
 
 // Round white button used for back / close / menu in headers.
 const roundBtn =

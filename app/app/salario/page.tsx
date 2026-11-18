@@ -17,7 +17,7 @@ export default function Salary() {
 
   if (!e)
     return (
-      <ScreenFrame title="Mi salario">
+      <ScreenFrame title="Mi salario" tab>
         {earnings.loading ? <LoadingCards count={3} label="Calculando tu salario" /> : <ErrorState error={earnings.error} onRetry={earnings.reload} />}
       </ScreenFrame>
     );
@@ -26,7 +26,7 @@ export default function Salary() {
   const l = e.limits;
 
   return (
-    <ScreenFrame title="Mi salario" className="md:grid md:grid-cols-2 md:grid-rows-[auto_1fr] md:items-start">
+    <ScreenFrame title="Mi salario" tab className="md:grid md:grid-cols-2 md:grid-rows-[auto_1fr] md:items-start">
       {/* md+: the calculation card spans two rows on the right; summary (wrapper, display:contents below md) and company rules stack on the left. */}
       <div className="contents md:flex md:flex-col md:gap-4">
       <Card tone="mint" className="flex items-center gap-5 p-5">

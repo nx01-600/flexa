@@ -69,7 +69,9 @@ function NavLink({ href, label, icon: Icon, active, onNavigate }: { href: string
 type Attention = { level: string; title: string; detail: string }[];
 type Overview = { period: { label: string; payDate: string } | null };
 
-// Redirects to the login when there is no company session.
+// Redirects to the login when there is no company session. Before hydration the session is
+// unknown, so the panel renders (its data comes from the API with the client token) and Next
+// can validate instant navigation; after hydration a missing session hides it and redirects.
 function useGuard() {
   const router = useRouter();
   const hydrated = useHydrated();
@@ -78,7 +80,7 @@ function useGuard() {
   useEffect(() => {
     if (hydrated && !valid) router.replace("/empresas/login");
   }, [hydrated, valid, router]);
-  return hydrated && valid;
+  return !hydrated || valid;
 }
 
 function UserMenu() {

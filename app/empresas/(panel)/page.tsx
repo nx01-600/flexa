@@ -38,7 +38,8 @@ const attentionHref = (title: string) =>
 
 export default function CompanyHome() {
   const session = useCompanySession();
-  const [now] = useState(Date.now);
+  // Read the clock only in the browser: `now` is used once the period loads (client fetch).
+  const [now] = useState(() => (typeof window === "undefined" ? 0 : Date.now()));
   const overview = useApi<Overview>("/analytics/overview");
   const summary = useApi<Summary>("/company/ewa/summary");
   const usage = useApi<Usage>("/analytics/usage");

@@ -15,8 +15,13 @@ const subscribe = (cb: () => void) => {
 // true / false on the client, null while server rendering.
 export const useSignedIn = () => useSyncExternalStore(subscribe, () => !!getSession("worker"), () => null);
 
-// Client-side auth gate: the session lives in localStorage, so the server renders nothing
-// for private screens and the browser decides whether to show them or go to the login.
+// Session user name; "" while server rendering, so hydration matches.
+export const useSessionName = () => useSyncExternalStore(subscribe, () => getSession("worker")?.user.name ?? "", () => "");
+
+// Client-side auth gate: the session lives in localStorage, so only the browser knows it.
+// While unknown (server render, hydration) the screen renders: data comes from the API with
+// the client token, so nothing private is in that HTML, and Next can validate instant
+// navigation. Once the browser knows there is no session it hides the screen and redirects.
 export function WorkerGuard({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
@@ -27,6 +32,6 @@ export function WorkerGuard({ children }: { children: ReactNode }) {
     if (!open && signedIn === false) router.replace("/app/login");
   }, [open, signedIn, router]);
 
-  if (open || signedIn) return children;
+  if (open || signedIn !== false) return children;
   return null;
 }

@@ -4,8 +4,8 @@ import { Logo } from "@/components/flexa/logo";
 import { LoginForm } from "@/components/flexa/login-form";
 import { Backdrop } from "@/components/flexa/shapes";
 
-// Below md: the phone login. From md up: full-width canvas (data-frame="wide" lifts the
-// 760px frame of app/app/layout.tsx) with the same card as the company login, centered.
+// Below md: the phone login. From md up: full-width canvas (WorkerFrame gives /app/login
+// no width cap) with the same card as the company login, centered.
 // The wrapper below is `display: contents` on phones, so mobile markup flow is unchanged.
 export default function WorkerLogin() {
   return (

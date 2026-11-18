@@ -63,7 +63,7 @@ export default function Services() {
   return (
     <>
       <Backdrop variant="inner" />
-      <TopBar title="Pagos y recargas" />
+      <TopBar title="Pagos y recargas" tab />
       <main className="flex flex-col gap-5 px-5 pt-3 pb-10">
         <Card tone="mint" className="relative isolate flex flex-col gap-3 overflow-hidden p-5">
           <Blob shape={2} tone="deep" className="-right-14 -bottom-16 -z-10 size-48 opacity-80" />

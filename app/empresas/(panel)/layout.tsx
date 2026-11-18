@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { CompanyShell } from "@/components/flexa/company-shell";
 
 export const metadata: Metadata = { title: "Flexa Empresas" };
 
-// CompanyShell gates on a localStorage session, so the server renders only a placeholder and
-// Next cannot validate instant navigation here. Opt out until auth moves to cookies.
-export const instant = false;
-
+// CompanyShell reads usePathname(); dynamic [id] routes need it inside a Suspense boundary.
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
-  return <CompanyShell>{children}</CompanyShell>;
+  return (
+    <Suspense fallback={<div className="min-h-dvh bg-page" aria-busy="true" />}>
+      <CompanyShell>{children}</CompanyShell>
+    </Suspense>
+  );
 }
