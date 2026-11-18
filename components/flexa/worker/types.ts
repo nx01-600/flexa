@@ -183,6 +183,7 @@ type Tone = "green" | "amber" | "gray" | "red" | "teal";
 export const advanceStatus: Record<string, { label: string; tone: Tone }> = {
   REQUESTED: { label: "Solicitado", tone: "teal" },
   APPROVED: { label: "Aprobado", tone: "teal" },
+  DISBURSING: { label: "Desembolsando", tone: "teal" },
   EXCEPTION: { label: "En revisión", tone: "amber" },
   DISBURSED: { label: "Desembolsado", tone: "green" },
   COMPLETED: { label: "Pagado", tone: "green" },

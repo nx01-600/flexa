@@ -1,11 +1,10 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Check, ChevronRight, EllipsisVertical, type IconType } from "@/components/flexa/icons";
 import type { ReactNode } from "react";
 import { Blob } from "@/components/flexa/shapes";
 import { Card, IconBox } from "@/components/flexa/ui";
-import { photo } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { Avatar as PhotoAvatar } from "@/components/flexa/worker/avatar";
 
 // Building blocks for Flexa Empresas (and the admin console). Desktop is the reference; below sm/lg they relax.
 
@@ -56,9 +55,9 @@ export function MoreLink({ href, children = "Ver más" }: { href: string; childr
 }
 
 
-// Initials circle with a tint picked from the name, stable across renders.
+// Sample portrait when one exists for the name, otherwise initials (the worker Avatar falls back on a 404).
 export function Avatar({ name, className }: { name: string; className?: string }) {
-  return <Image src={photo(name)} alt="" width={80} height={80} className={cn("size-9 shrink-0 rounded-full object-cover ring-2 ring-white shadow-xs", className)} />;
+  return <PhotoAvatar name={name} size={36} className={cn("size-9 shrink-0 ring-2 ring-white shadow-xs", className)} />;
 }
 
 export function Kebab({ label }: { label: string }) {

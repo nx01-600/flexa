@@ -48,6 +48,22 @@ const actions: Record<string, string> = {
   COMPENSATION_REPORTED: "Descuentos reportados",
   ACTIVATED: "Activado",
   DEACTIVATED: "Desactivado",
+  REQUESTED: "Solicitud",
+  CANCELLED: "Cancelación",
+  DISBURSING: "Desembolsando",
+  DISBURSED: "Desembolso",
+  DISBURSEMENT_FAILED: "Desembolso fallido",
+  EXCEPTION_APPROVED: "Excepción aprobada",
+  EXCEPTION_REJECTED: "Excepción rechazada",
+  REGISTERED: "Registro",
+  KYC_APPROVED: "Identidad verificada",
+  PROFILE_UPDATED: "Perfil actualizado",
+  TEAM_MEMBER_ADDED: "Miembro agregado",
+  COMPENSATION_EXPORTED: "Descuentos exportados",
+  REMOVED: "Eliminación",
+  PUBLISHED: "Publicación",
+  ESCALATED: "Escalado",
+  DEMO_DATA_LOADED: "Datos de demostración",
 };
 
 // Compact, readable rendering of the audit payload.
