@@ -144,9 +144,9 @@ export function WorkerFrame({ children }: { children: ReactNode }) {
   // null = session not known yet (server/hydration): assume signed in to avoid a layout jump.
   if (NO_NAV.includes(path) || signedIn === false) return <div className="contents md:mx-auto md:block md:max-w-[760px]">{children}</div>;
   return (
-    <div className="contents md:mx-auto md:flex md:max-w-[1100px]">
+    <div className="contents md:flex">
       <SideNav />
-      <div className="contents md:block md:min-w-0 md:flex-1 md:px-4 md:pb-10 lg:px-8">{children}</div>
+      <div className="contents md:block md:min-w-0 md:flex-1 md:px-4 md:pb-10 lg:px-8 xl:px-12">{children}</div>
     </div>
   );
 }

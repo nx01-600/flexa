@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Flexa" };
 
 // Worker app. Below md: a phone-width column (centered with a shadow from sm up).
 // From md up the column becomes a full-bleed canvas (bg-page, no shadow) and WorkerFrame
-// picks the content width by route: side nav + 1100px for signed-in screens, a 760px
+// picks the content width by route: side nav + full-width content for signed-in screens, a 760px
 // column for pre-account screens, full width for login. `isolate` lets each screen's
 // Backdrop sit behind its content; the Backdrop anchors to this root, so keep the frame non-positioned.
 export default function WorkerLayout({ children }: LayoutProps<"/app">) {
